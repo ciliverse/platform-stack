@@ -1,0 +1,2 @@
+# Differences from upstream defaults only. Default: disabled.
+# Do not enable together with a second GitOps controller unless you know why.

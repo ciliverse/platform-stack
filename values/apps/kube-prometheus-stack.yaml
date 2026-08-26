@@ -1,0 +1,2 @@
+# Differences from upstream defaults only.
+# Kind / demo slimming: helmfile -e kind (see values/kind/).

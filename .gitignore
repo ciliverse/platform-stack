@@ -1,0 +1,7 @@
+values/private.yaml
+.helmfile/
+charts/*.tgz
+*.tgz
+kubeconfig
+kubeconfig.*
+.DS_Store

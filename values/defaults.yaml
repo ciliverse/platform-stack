@@ -1,0 +1,46 @@
+# Helmfile state values: switches, pins, namespaces.
+# Chart-specific overlays live in values/apps/ and values/kind/.
+
+kindMirror: false
+
+apps:
+  kubePrometheusStack:
+    enabled: true
+    version: "86.1.1"
+    namespace: monitoring
+  opentelemetryCollector:
+    enabled: true
+    version: "0.147.1"
+    namespace: observability
+  tempo:
+    enabled: true
+    version: "1.24.4"
+    namespace: observability
+  headlamp:
+    enabled: true
+    version: "0.40.1"
+    namespace: headlamp
+  argoCd:
+    enabled: false
+    version: "9.4.17"
+    namespace: argocd
+  flux2:
+    enabled: false
+    version: "2.18.4"
+    namespace: flux-system
+  gitlab:
+    enabled: false
+    version: "10.0.1"
+    namespace: gitlab
+  jenkins:
+    enabled: false
+    version: "5.9.9"
+    namespace: jenkins
+  postgresql:
+    enabled: false
+    version: "18.6.8"
+    namespace: postgresql
+  redis:
+    enabled: false
+    version: "25.5.3"
+    namespace: redis

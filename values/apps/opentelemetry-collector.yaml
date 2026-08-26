@@ -1,0 +1,7 @@
+# Chart 0.147+ requires an explicit image (no implicit default).
+# Official k8s distribution: https://github.com/open-telemetry/opentelemetry-helm-charts
+mode: deployment
+image:
+  repository: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s
+command:
+  name: otelcol-k8s

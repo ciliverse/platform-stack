@@ -1,0 +1,123 @@
+environments:
+  default:
+    values:
+      - values/defaults.yaml
+  kind:
+    values:
+      - values/defaults.yaml
+      - values/kind.yaml
+---
+repositories:
+  - name: prometheus-community
+    url: https://prometheus-community.github.io/helm-charts
+  - name: open-telemetry
+    url: https://open-telemetry.github.io/opentelemetry-helm-charts
+  - name: grafana
+    url: https://grafana.github.io/helm-charts
+  - name: headlamp
+    url: https://kubernetes-sigs.github.io/headlamp/
+  - name: argo
+    url: https://argoproj.github.io/argo-helm
+  - name: fluxcd-community
+    url: https://fluxcd-community.github.io/helm-charts
+  - name: gitlab
+    url: https://charts.gitlab.io/
+  - name: jenkins
+    url: https://charts.jenkins.io
+
+releases:
+  - name: kube-prometheus-stack
+    namespace: {{ .Values.apps.kubePrometheusStack.namespace }}
+    chart: prometheus-community/kube-prometheus-stack
+    version: {{ .Values.apps.kubePrometheusStack.version | quote }}
+    installed: {{ .Values.apps.kubePrometheusStack.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/kube-prometheus-stack.yaml
+      {{- if eq .Environment.Name "kind" }}
+      - values/kind/kube-prometheus-stack.yaml
+      {{- if .Values.kindMirror }}
+      - values/kind/kube-prometheus-stack-mirror.yaml
+      {{- end }}
+      {{- end }}
+
+  - name: opentelemetry-collector
+    namespace: {{ .Values.apps.opentelemetryCollector.namespace }}
+    chart: open-telemetry/opentelemetry-collector
+    version: {{ .Values.apps.opentelemetryCollector.version | quote }}
+    installed: {{ .Values.apps.opentelemetryCollector.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/opentelemetry-collector.yaml
+
+  - name: tempo
+    namespace: {{ .Values.apps.tempo.namespace }}
+    chart: grafana/tempo
+    version: {{ .Values.apps.tempo.version | quote }}
+    installed: {{ .Values.apps.tempo.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/tempo.yaml
+
+  - name: headlamp
+    namespace: {{ .Values.apps.headlamp.namespace }}
+    chart: headlamp/headlamp
+    version: {{ .Values.apps.headlamp.version | quote }}
+    installed: {{ .Values.apps.headlamp.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/headlamp.yaml
+
+  - name: argo-cd
+    namespace: {{ .Values.apps.argoCd.namespace }}
+    chart: argo/argo-cd
+    version: {{ .Values.apps.argoCd.version | quote }}
+    installed: {{ .Values.apps.argoCd.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/argo-cd.yaml
+
+  - name: flux2
+    namespace: {{ .Values.apps.flux2.namespace }}
+    chart: fluxcd-community/flux2
+    version: {{ .Values.apps.flux2.version | quote }}
+    installed: {{ .Values.apps.flux2.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/flux2.yaml
+
+  - name: gitlab
+    namespace: {{ .Values.apps.gitlab.namespace }}
+    chart: gitlab/gitlab
+    version: {{ .Values.apps.gitlab.version | quote }}
+    installed: {{ .Values.apps.gitlab.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/gitlab.yaml
+
+  - name: jenkins
+    namespace: {{ .Values.apps.jenkins.namespace }}
+    chart: jenkins/jenkins
+    version: {{ .Values.apps.jenkins.version | quote }}
+    installed: {{ .Values.apps.jenkins.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/jenkins.yaml
+
+  - name: postgresql
+    namespace: {{ .Values.apps.postgresql.namespace }}
+    chart: oci://registry-1.docker.io/bitnamicharts/postgresql
+    version: {{ .Values.apps.postgresql.version | quote }}
+    installed: {{ .Values.apps.postgresql.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/postgresql.yaml
+
+  - name: redis
+    namespace: {{ .Values.apps.redis.namespace }}
+    chart: oci://registry-1.docker.io/bitnamicharts/redis
+    version: {{ .Values.apps.redis.version | quote }}
+    installed: {{ .Values.apps.redis.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/redis.yaml

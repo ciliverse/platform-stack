@@ -1,0 +1,3 @@
+# helmfile -e kind
+# Extra Helmfile state. Chart overlays are values/kind/*.yaml
+kindMirror: false

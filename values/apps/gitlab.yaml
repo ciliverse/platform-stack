@@ -1,0 +1,3 @@
+# Default: disabled. Point GitLab at your own host via private.yaml.
+# Do NOT set global.hosts.domain to cillian.website — that hostname is in use.
+# Put secrets in values/private.yaml (gitignored), not here.
