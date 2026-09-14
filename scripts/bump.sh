@@ -29,10 +29,32 @@ search = {
     "flux2": "fluxcd-community/flux2",
     "gitlab": "gitlab/gitlab",
     "jenkins": "jenkins/jenkins",
+    "cilikube": "ciliverse/cilikube",
+    "apisix": "apisix/apisix",
+    "localPathProvisioner": "containeroo/local-path-provisioner",
+    "metallb": "metallb/metallb",
+    "certManager": "jetstack/cert-manager",
+    "rustfs": "rustfs/rustfs",
+    "minio": "minio/minio",
+    "juicefsCsi": "juicefs/juicefs-csi-driver",
+    "nats": "nats/nats",
+    "harbor": "harbor/harbor",
+    "gitlabRunner": "gitlab/gitlab-runner",
+    "metricsServer": "metrics-server/metrics-server",
+    "externalDns": "external-dns/external-dns",
+    "victoriaLogs": "vm/victoria-logs-single",
+    "victoriaLogsCollector": "vm/victoria-logs-collector",
+    "victoriaMetrics": "vm/victoria-metrics-single",
+    "loki": "grafana/loki",
+    "pyroscope": "grafana/pyroscope",
+    "beyla": "grafana/beyla",
+    "istio": "istio/istiod",
 }
 oci = {
     "postgresql": "oci://registry-1.docker.io/bitnamicharts/postgresql",
     "redis": "oci://registry-1.docker.io/bitnamicharts/redis",
+    "gatewayApi": "oci://docker.io/envoyproxy/gateway-crds-helm",
+    "envoyGateway": "oci://docker.io/envoyproxy/gateway-helm",
 }
 
 repos = [
@@ -44,6 +66,20 @@ repos = [
     ("fluxcd-community", "https://fluxcd-community.github.io/helm-charts"),
     ("gitlab", "https://charts.gitlab.io/"),
     ("jenkins", "https://charts.jenkins.io"),
+    ("ciliverse", "https://charts.cillian.website"),
+    ("apisix", "https://charts.apiseven.com"),
+    ("containeroo", "https://charts.containeroo.ch"),
+    ("metallb", "https://metallb.github.io/metallb"),
+    ("jetstack", "https://charts.jetstack.io"),
+    ("rustfs", "https://charts.rustfs.com"),
+    ("minio", "https://charts.min.io/"),
+    ("juicefs", "https://juicedata.github.io/charts/"),
+    ("nats", "https://nats-io.github.io/k8s/helm/charts/"),
+    ("harbor", "https://helm.goharbor.io"),
+    ("vm", "https://victoriametrics.github.io/helm-charts/"),
+    ("istio", "https://istio-release.storage.googleapis.com/charts"),
+    ("metrics-server", "https://kubernetes-sigs.github.io/metrics-server/"),
+    ("external-dns", "https://kubernetes-sigs.github.io/external-dns/"),
 ]
 for name, url in repos:
     subprocess.run(["helm", "repo", "add", name, url], check=False, capture_output=True)

@@ -1,0 +1,5 @@
+# Log store. Query UI / Grafana at :9428. Collector ships node container logs here.
+server:
+  persistentVolume:
+    enabled: true
+    storageClassName: local-path

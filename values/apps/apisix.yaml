@@ -1,0 +1,12 @@
+# Gateway: LoadBalancer so MetalLB can assign a VIP.
+# Kind overlay (values/kind/apisix.yaml) switches this back to NodePort.
+# Do not apply this list onto a cluster that already runs APISIX; it would try to take over that install.
+service:
+  type: LoadBalancer
+  http:
+    enabled: true
+    servicePort: 80
+
+# Ingress / ApisixRoute so CiliKube、Grafana、业务 Service 可以挂域名。
+ingress-controller:
+  enabled: true

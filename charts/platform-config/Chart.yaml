@@ -1,0 +1,6 @@
+apiVersion: v2
+name: platform-config
+description: MetalLB pool, cert-manager issuers, optional example Ingress
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

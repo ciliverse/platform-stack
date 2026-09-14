@@ -1,3 +1,9 @@
 # helmfile -e kind
-# Extra Helmfile state. Chart overlays are values/kind/*.yaml
+# Kind already has local-path; MetalLB L2 is not the Kind entry path.
 kindMirror: false
+
+apps:
+  localPathProvisioner:
+    enabled: false
+  metallb:
+    enabled: false

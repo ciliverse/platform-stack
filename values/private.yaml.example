@@ -1,0 +1,63 @@
+# Copy to values/private.yaml (gitignored).
+#
+#   cp values/private.yaml.example values/private.yaml
+#   openssl rand -hex 16   # jwtSecret (>=16) and encryptionKey (exactly 32)
+#   openssl rand -hex 16   # redis.password (hex avoids metaurl encoding)
+#
+# Default env (MetalLB on): metallb.addresses MUST be a real L2 range on the
+# LAN, not the placeholder below, or helmfile template/apply fails.
+
+secrets:
+  jwtSecret: "REPLACE_ME_GENERATE_WITH_openssl_rand"
+  encryptionKey: "REPLACE_ME_32_CHARS_openssl_hex16"
+
+metallb:
+  addresses: "192.168.0.0-192.168.0.0"
+
+letsencrypt:
+  email: ""
+
+fluxGitops:
+  gitUrl: ""
+  branch: main
+  # read-only token for Flux to clone the repo (not the CI write token);
+  # leave empty for a public repo
+  deployToken: ""
+  # one entry per directory Flux should apply; without any, the repo is
+  # fetched but nothing lands in the cluster
+  kustomizations: []
+  # - name: demo
+  #   path: ./apps/demo
+  #   namespace: demo        # where the Kustomization object lives; default flux-system
+  #   createNamespace: true
+
+hosts:
+  cilikube: ""
+  grafana: ""
+
+redis:
+  password: ""
+
+rustfs:
+  accessKey: ""
+  secretKey: ""
+
+minio:
+  rootUser: ""
+  rootPassword: ""
+
+juicefs:
+  name: "jfs"
+
+harbor:
+  adminPassword: ""
+
+gitlabRunner:
+  gitlabUrl: ""
+  runnerToken: ""
+
+externalDns:
+  provider: ""
+  txtOwnerId: "helm-charts"
+  domainFilters: []
+  cloudflareApiToken: ""

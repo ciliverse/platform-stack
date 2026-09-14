@@ -1,2 +1,5 @@
 # Differences from upstream defaults only. Default: disabled.
-# Auth: values/private.yaml (gitignored).
+# Password: values/private.yaml redis.password (helmfile inline).
+architecture: standalone
+auth:
+  enabled: true

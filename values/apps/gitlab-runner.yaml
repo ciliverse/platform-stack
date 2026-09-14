@@ -1,0 +1,4 @@
+# Runs GitLab CI jobs in-cluster. Default: disabled.
+# gitlabUrl and runnerToken come from values/private.yaml via helmfile.
+rbac:
+  create: true

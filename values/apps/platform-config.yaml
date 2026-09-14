@@ -1,0 +1,2 @@
+# Values for ./charts/platform-config. Per-cluster hosts / VIP / ACME come
+# from helmfile inline values (private.yaml), not from this file.

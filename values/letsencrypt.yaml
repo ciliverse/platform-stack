@@ -1,0 +1,4 @@
+# Optional overlay: helmfile apply --state-values-file values/letsencrypt.yaml
+# Still requires letsencrypt.email in values/private.yaml.
+letsencrypt:
+  enabled: true

@@ -1,3 +1,5 @@
-# Default: disabled. Point GitLab at your own host via private.yaml.
-# Do NOT set global.hosts.domain to cillian.website — that hostname is in use.
+# Default: disabled. Registry is on when this release is enabled; if Harbor
+# is also enabled, helmfile turns GitLab Registry off (CI should push to one).
 # Put secrets in values/private.yaml (gitignored), not here.
+registry:
+  enabled: true

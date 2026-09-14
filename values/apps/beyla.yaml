@@ -1,0 +1,2 @@
+# eBPF auto-instrumentation. Privileged DaemonSet. Default: disabled.
+# Pair with Pyroscope / OTel when you want cluster-wide profiles without SDK.

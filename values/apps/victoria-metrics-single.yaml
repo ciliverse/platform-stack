@@ -1,0 +1,6 @@
+# Optional Prometheus alternative. Do not treat this and kube-prometheus-stack
+# as two primary scrapers at once.
+server:
+  persistentVolume:
+    enabled: true
+    storageClassName: local-path

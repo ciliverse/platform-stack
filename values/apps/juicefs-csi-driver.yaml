@@ -1,0 +1,4 @@
+# POSIX/CSI on Redis + (RustFS or MinIO). StorageClass name juicefs is filled
+# by helmfile from private.yaml when this release is enabled.
+dashboard:
+  enabled: false

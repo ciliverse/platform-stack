@@ -1,0 +1,21 @@
+# Independent image registry. Default: disabled.
+# Pick Harbor or GitLab Registry for CI push, not both.
+expose:
+  type: clusterIP
+  tls:
+    enabled: false
+externalURL: http://harbor.harbor.svc
+persistence:
+  persistentVolumeClaim:
+    registry:
+      storageClass: local-path
+    jobservice:
+      jobLog:
+        storageClass: local-path
+    database:
+      storageClass: local-path
+    redis:
+      storageClass: local-path
+    trivy:
+      storageClass: local-path
+# harborAdminPassword comes from values/private.yaml via helmfile.

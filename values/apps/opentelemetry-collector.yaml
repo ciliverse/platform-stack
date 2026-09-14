@@ -5,3 +5,19 @@ image:
   repository: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s
 command:
   name: otelcol-k8s
+
+# The chart ships `debug` as the only exporter, so out of the box every span
+# received here is dropped. Point traces at Tempo, which listens on OTLP 4317
+# by default. Receivers and processors keep the chart defaults.
+config:
+  exporters:
+    otlp/tempo:
+      endpoint: tempo.observability.svc:4317
+      tls:
+        insecure: true
+  service:
+    pipelines:
+      traces:
+        exporters:
+          - otlp/tempo
+          - debug

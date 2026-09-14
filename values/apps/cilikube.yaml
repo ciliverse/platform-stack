@@ -1,0 +1,15 @@
+# Differences from ciliverse/cilikube defaults only.
+# Helm repo chart is 1.0.0 (https://charts.cillian.website); source Chart.yaml is 1.5.0 but not published yet.
+# Images on GHCR already have v1.5.0 — pin tags here until the chart index catches up.
+backend:
+  image:
+    tag: v1.5.0
+frontend:
+  image:
+    tag: v1.5.0
+
+ingress:
+  enabled: false
+
+# jwtSecret (>=16) and encryptionKey (exactly 32) go in values/private.yaml, not here.
+# See values/private.yaml.example.

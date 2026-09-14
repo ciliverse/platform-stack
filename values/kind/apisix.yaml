@@ -1,0 +1,6 @@
+# Kind has no MetalLB L2 VIP; keep the NodePort debug port.
+service:
+  type: NodePort
+  http:
+    enabled: true
+    servicePort: 80

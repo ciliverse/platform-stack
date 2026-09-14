@@ -1,0 +1,32 @@
+metallb:
+  enabled: false
+  addresses: ""
+  poolName: default-pool
+  namespace: metallb-system
+
+certManager:
+  enabled: false
+
+letsencrypt:
+  enabled: false
+  email: ""
+  server: https://acme-v02.api.letsencrypt.org/directory
+  ingressClass: apisix
+
+exampleIngress:
+  enabled: false
+  clusterIssuer: selfsigned
+  cilikube:
+    enabled: true
+    namespace: cilikube
+    host: ""
+    serviceName: cilikube-frontend
+    servicePort: 80
+    tlsSecretName: cilikube-tls
+  grafana:
+    enabled: true
+    namespace: monitoring
+    host: ""
+    serviceName: kube-prometheus-stack-grafana
+    servicePort: 80
+    tlsSecretName: grafana-tls

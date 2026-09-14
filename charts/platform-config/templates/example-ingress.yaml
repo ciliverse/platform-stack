@@ -1,0 +1,56 @@
+{{- if .Values.exampleIngress.enabled }}
+{{- $issuer := .Values.exampleIngress.clusterIssuer }}
+{{- if and .Values.exampleIngress.cilikube.enabled .Values.exampleIngress.cilikube.host }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cilikube
+  namespace: {{ .Values.exampleIngress.cilikube.namespace }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ $issuer | quote }}
+spec:
+  ingressClassName: apisix
+  tls:
+    - hosts:
+        - {{ .Values.exampleIngress.cilikube.host | quote }}
+      secretName: {{ .Values.exampleIngress.cilikube.tlsSecretName }}
+  rules:
+    - host: {{ .Values.exampleIngress.cilikube.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.exampleIngress.cilikube.serviceName }}
+                port:
+                  number: {{ .Values.exampleIngress.cilikube.servicePort }}
+{{- end }}
+{{- if and .Values.exampleIngress.grafana.enabled .Values.exampleIngress.grafana.host }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana
+  namespace: {{ .Values.exampleIngress.grafana.namespace }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ $issuer | quote }}
+spec:
+  ingressClassName: apisix
+  tls:
+    - hosts:
+        - {{ .Values.exampleIngress.grafana.host | quote }}
+      secretName: {{ .Values.exampleIngress.grafana.tlsSecretName }}
+  rules:
+    - host: {{ .Values.exampleIngress.grafana.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.exampleIngress.grafana.serviceName }}
+                port:
+                  number: {{ .Values.exampleIngress.grafana.servicePort }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,4 @@
+# Sidecar control plane. North-south traffic stays on APISIX; do not enable
+# Istio ingress gateway in this list.
+pilot:
+  autoscaleEnabled: false

@@ -1,0 +1,5 @@
+# Gateway API implementation. Default: disabled.
+# APISIX remains the default north-south Ingress. Use GatewayClass `eg`
+# and HTTPRoute when this is on. CRDs come from the gateway-api release.
+crds:
+  enabled: false

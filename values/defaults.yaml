@@ -1,9 +1,91 @@
 # Helmfile state values: switches, pins, namespaces.
+# Categories (README): 代码 / CI / 镜像仓库 / CD / 流量入口 / 存储 / 中间件 / 可观测 / 服务网格 / 集群管理.
+# metrics-server is cluster admin (HPA / kubectl top). GitLab Runner is CI. ExternalDNS is DNS for ingress.
 # Chart-specific overlays live in values/apps/ and values/kind/.
 
 kindMirror: false
 
+# Points an installed Flux at a Git repository. What it watches is per-cluster,
+# so gitUrl / kustomizations belong in values/private.yaml.
+fluxGitops:
+  enabled: false
+  sourceName: gitops
+  branch: main
+  kustomizations: []
+
+letsencrypt:
+  enabled: false
+exampleIngress:
+  enabled: false
+
 apps:
+  # --- 代码 / CI / CD / 镜像仓库 ---
+  gitlab:
+    enabled: false
+    version: "10.0.1"
+    namespace: gitlab
+  jenkins:
+    enabled: false
+    version: "5.9.9"
+    namespace: jenkins
+  argoCd:
+    enabled: false
+    version: "9.4.17"
+    namespace: argocd
+  flux2:
+    enabled: false
+    version: "2.18.4"
+    namespace: flux-system
+  harbor:
+    enabled: false
+    version: "1.19.2"
+    namespace: harbor
+  gitlabRunner:
+    enabled: false
+    version: "0.92.1"
+    namespace: gitlab-runner
+
+  # --- 流量入口 / 存储 / 集群管理 / 可观测 ---
+  localPathProvisioner:
+    enabled: true
+    version: "0.0.38"
+    namespace: local-path-storage
+  metallb:
+    enabled: true
+    version: "0.16.1"
+    namespace: metallb-system
+  metricsServer:
+    enabled: true
+    version: "3.14.0"
+    namespace: kube-system
+  certManager:
+    enabled: true
+    version: "v1.21.2"
+    namespace: cert-manager
+  apisix:
+    enabled: true
+    version: "2.17.0"
+    namespace: apisix
+  gatewayApi:
+    enabled: false
+    version: "v1.9.1"
+    namespace: envoy-gateway-system
+  envoyGateway:
+    enabled: false
+    version: "v1.9.1"
+    namespace: envoy-gateway-system
+  externalDns:
+    enabled: false
+    version: "1.22.0"
+    namespace: external-dns
+  cilikube:
+    enabled: true
+    version: "1.0.0"
+    namespace: cilikube
+  headlamp:
+    enabled: true
+    version: "0.40.1"
+    namespace: headlamp
   kubePrometheusStack:
     enabled: true
     version: "86.1.1"
@@ -16,26 +98,36 @@ apps:
     enabled: true
     version: "1.24.4"
     namespace: observability
-  headlamp:
+  victoriaLogs:
     enabled: true
-    version: "0.40.1"
-    namespace: headlamp
-  argoCd:
+    version: "0.13.9"
+    namespace: observability
+  victoriaLogsCollector:
+    enabled: true
+    version: "0.3.7"
+    namespace: observability
+  victoriaMetrics:
     enabled: false
-    version: "9.4.17"
-    namespace: argocd
-  flux2:
+    version: "0.46.0"
+    namespace: observability
+  loki:
     enabled: false
-    version: "2.18.4"
-    namespace: flux-system
-  gitlab:
+    version: "6.55.0"
+    namespace: observability
+  pyroscope:
+    enabled: true
+    version: "2.3.1"
+    namespace: observability
+  beyla:
     enabled: false
-    version: "10.0.1"
-    namespace: gitlab
-  jenkins:
+    version: "1.16.11"
+    namespace: observability
+  istio:
     enabled: false
-    version: "5.9.9"
-    namespace: jenkins
+    version: "1.30.4"
+    namespace: istio-system
+
+  # --- 存储（对象 / JuiceFS）与中间件 ---
   postgresql:
     enabled: false
     version: "18.6.8"
@@ -44,3 +136,19 @@ apps:
     enabled: false
     version: "25.5.3"
     namespace: redis
+  rustfs:
+    enabled: false
+    version: "1.0.0-rc.6"
+    namespace: rustfs
+  minio:
+    enabled: false
+    version: "5.4.0"
+    namespace: minio
+  juicefsCsi:
+    enabled: false
+    version: "0.32.5"
+    namespace: kube-system
+  nats:
+    enabled: false
+    version: "2.14.6"
+    namespace: nats

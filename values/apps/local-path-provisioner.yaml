@@ -1,0 +1,6 @@
+# Default StorageClass for empty clusters. Disable if OpenEBS (or another
+# provisioner) is already the cluster default.
+storageClass:
+  create: true
+  defaultClass: true
+  name: local-path

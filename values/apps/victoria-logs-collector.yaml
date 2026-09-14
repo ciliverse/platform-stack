@@ -1,0 +1,2 @@
+# Ships Kubernetes container logs into VictoriaLogs. Destination URL is
+# filled by helmfile from the victoria-logs-single Service.

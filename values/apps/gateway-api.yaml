@@ -1,0 +1,6 @@
+# Kubernetes Gateway API CRDs (Gateway, HTTPRoute, …). Cluster-scoped.
+# Channel: standard. Envoy Gateway CRDs are added when that release is on.
+crds:
+  gatewayAPI:
+    enabled: true
+    channel: standard

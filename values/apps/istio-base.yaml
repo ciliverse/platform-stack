@@ -1,0 +1,2 @@
+# Istio CRDs. Installed together with istiod via apps.istio.enabled.
+defaultRevision: default

@@ -1,0 +1,2 @@
+# Ships node logs to Loki. Installed only when loki is enabled.
+# Client URL is set by helmfile.

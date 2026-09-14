@@ -1,0 +1,9 @@
+# Continuous profiling store. Apps push profiles to this Service.
+pyroscope:
+  extraArgs:
+    log.level: info
+  persistence:
+    enabled: true
+    size: 10Gi
+minio:
+  enabled: false

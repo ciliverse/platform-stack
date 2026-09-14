@@ -2,11 +2,105 @@ environments:
   default:
     values:
       - values/defaults.yaml
+      - path: values/private.yaml
+        missingFileHandler: Warn
   kind:
     values:
       - values/defaults.yaml
       - values/kind.yaml
+      - path: values/private.yaml
+        missingFileHandler: Warn
 ---
+{{- if .Values.apps.victoriaLogsCollector.enabled }}
+{{- if not .Values.apps.victoriaLogs.enabled }}
+{{- fail "victoriaLogsCollector requires apps.victoriaLogs.enabled" }}
+{{- end }}
+{{- end }}
+{{- if and .Values.apps.victoriaLogs.enabled .Values.apps.loki.enabled }}
+{{- fail "victoriaLogs and loki are mutually exclusive; enable only one log store" }}
+{{- end }}
+{{- if .Values.apps.juicefsCsi.enabled }}
+{{- if not .Values.apps.redis.enabled }}
+{{- fail "juicefs requires apps.redis.enabled" }}
+{{- end }}
+{{- if and (not .Values.apps.rustfs.enabled) (not .Values.apps.minio.enabled) }}
+{{- fail "juicefs requires rustfs or minio" }}
+{{- end }}
+{{- $rp := dig "redis" "password" "" .Values }}
+{{- if not $rp }}
+{{- fail "juicefs requires redis.password in values/private.yaml" }}
+{{- end }}
+{{- end }}
+{{- if .Values.apps.redis.enabled }}
+{{- $rp := dig "redis" "password" "" .Values }}
+{{- if not $rp }}
+{{- fail "set redis.password in values/private.yaml" }}
+{{- end }}
+{{- end }}
+{{- if .Values.apps.metallb.enabled }}
+{{- $addr := dig "metallb" "addresses" "" .Values }}
+{{- if or (eq $addr "") (eq $addr "192.168.0.0-192.168.0.0") }}
+{{- fail "set metallb.addresses in values/private.yaml to a real L2 range (not 192.168.0.0-192.168.0.0)" }}
+{{- end }}
+{{- end }}
+{{- if .Values.apps.rustfs.enabled }}
+{{- $ak := dig "rustfs" "accessKey" "" .Values }}
+{{- $sk := dig "rustfs" "secretKey" "" .Values }}
+{{- if or (eq $ak "") (eq $sk "") (eq $ak "rustfsadmin") }}
+{{- fail "set rustfs.accessKey and rustfs.secretKey in values/private.yaml (not rustfsadmin)" }}
+{{- end }}
+{{- end }}
+{{- if .Values.apps.minio.enabled }}
+{{- $mu := dig "minio" "rootUser" "" .Values }}
+{{- $mp := dig "minio" "rootPassword" "" .Values }}
+{{- if or (eq $mu "") (eq $mp "") }}
+{{- fail "set minio.rootUser and minio.rootPassword in values/private.yaml" }}
+{{- end }}
+{{- end }}
+{{- if .Values.apps.harbor.enabled }}
+{{- $hp := dig "harbor" "adminPassword" "" .Values }}
+{{- if or (eq $hp "") (eq $hp "Harbor12345") }}
+{{- fail "set harbor.adminPassword in values/private.yaml (not Harbor12345)" }}
+{{- end }}
+{{- end }}
+{{- if .Values.apps.gitlabRunner.enabled }}
+{{- $gu := dig "gitlabRunner" "gitlabUrl" "" .Values }}
+{{- $rt := dig "gitlabRunner" "runnerToken" "" .Values }}
+{{- if or (eq $gu "") (eq $rt "") }}
+{{- fail "set gitlabRunner.gitlabUrl and gitlabRunner.runnerToken in values/private.yaml" }}
+{{- end }}
+{{- end }}
+{{- if .Values.apps.externalDns.enabled }}
+{{- $p := dig "externalDns" "provider" "" .Values }}
+{{- if eq $p "" }}
+{{- fail "set externalDns.provider in values/private.yaml (e.g. cloudflare)" }}
+{{- end }}
+{{- if and (eq $p "cloudflare") (eq (dig "externalDns" "cloudflareApiToken" "" .Values) "") }}
+{{- fail "set externalDns.cloudflareApiToken in values/private.yaml" }}
+{{- end }}
+{{- end }}
+{{- if and (.Values.letsencrypt.enabled | default false) (not (dig "letsencrypt" "email" "" .Values)) }}
+{{- fail "letsencrypt.enabled requires letsencrypt.email in values/private.yaml" }}
+{{- end }}
+{{- if .Values.fluxGitops.enabled }}
+{{- if not (dig "fluxGitops" "gitUrl" "" .Values) }}
+{{- fail "fluxGitops.enabled requires fluxGitops.gitUrl in values/private.yaml" }}
+{{- end }}
+{{- if not (dig "fluxGitops" "kustomizations" (list) .Values) }}
+{{- fail "fluxGitops.enabled requires fluxGitops.kustomizations in values/private.yaml" }}
+{{- end }}
+{{- if not .Values.apps.flux2.enabled }}
+{{- fail "fluxGitops.enabled requires apps.flux2.enabled" }}
+{{- end }}
+{{- end }}
+{{- if .Values.exampleIngress.enabled }}
+{{- $ch := dig "hosts" "cilikube" "" .Values }}
+{{- $gh := dig "hosts" "grafana" "" .Values }}
+{{- if and (eq $ch "") (eq $gh "") }}
+{{- fail "exampleIngress.enabled requires hosts.cilikube or hosts.grafana in values/private.yaml" }}
+{{- end }}
+{{- end }}
+
 repositories:
   - name: prometheus-community
     url: https://prometheus-community.github.io/helm-charts
@@ -24,6 +118,34 @@ repositories:
     url: https://charts.gitlab.io/
   - name: jenkins
     url: https://charts.jenkins.io
+  - name: apisix
+    url: https://charts.apiseven.com
+  - name: ciliverse
+    url: https://charts.cillian.website
+  - name: containeroo
+    url: https://charts.containeroo.ch
+  - name: metallb
+    url: https://metallb.github.io/metallb
+  - name: jetstack
+    url: https://charts.jetstack.io
+  - name: rustfs
+    url: https://charts.rustfs.com
+  - name: minio
+    url: https://charts.min.io/
+  - name: juicefs
+    url: https://juicedata.github.io/charts/
+  - name: nats
+    url: https://nats-io.github.io/k8s/helm/charts/
+  - name: harbor
+    url: https://helm.goharbor.io
+  - name: vm
+    url: https://victoriametrics.github.io/helm-charts/
+  - name: istio
+    url: https://istio-release.storage.googleapis.com/charts
+  - name: metrics-server
+    url: https://kubernetes-sigs.github.io/metrics-server/
+  - name: external-dns
+    url: https://kubernetes-sigs.github.io/external-dns/
 
 releases:
   - name: kube-prometheus-stack
@@ -59,6 +181,106 @@ releases:
     values:
       - values/apps/tempo.yaml
 
+  - name: victoria-logs-single
+    namespace: {{ .Values.apps.victoriaLogs.namespace }}
+    chart: vm/victoria-logs-single
+    version: {{ .Values.apps.victoriaLogs.version | quote }}
+    installed: {{ .Values.apps.victoriaLogs.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/victoria-logs-single.yaml
+
+  - name: victoria-logs-collector
+    namespace: {{ .Values.apps.victoriaLogsCollector.namespace }}
+    chart: vm/victoria-logs-collector
+    version: {{ .Values.apps.victoriaLogsCollector.version | quote }}
+    installed: {{ .Values.apps.victoriaLogsCollector.enabled }}
+    createNamespace: true
+    {{- if .Values.apps.victoriaLogsCollector.enabled }}
+    needs:
+      - observability/victoria-logs-single
+    {{- end }}
+    values:
+      - values/apps/victoria-logs-collector.yaml
+      - remoteWrite:
+          - url: http://victoria-logs-single-server.{{ .Values.apps.victoriaLogs.namespace }}.svc:9428
+
+  - name: victoria-metrics-single
+    namespace: {{ .Values.apps.victoriaMetrics.namespace }}
+    chart: vm/victoria-metrics-single
+    version: {{ .Values.apps.victoriaMetrics.version | quote }}
+    installed: {{ .Values.apps.victoriaMetrics.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/victoria-metrics-single.yaml
+
+  - name: loki
+    namespace: {{ .Values.apps.loki.namespace }}
+    chart: grafana/loki
+    version: {{ .Values.apps.loki.version | quote }}
+    installed: {{ .Values.apps.loki.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/loki.yaml
+
+  - name: promtail
+    namespace: {{ .Values.apps.loki.namespace }}
+    chart: grafana/promtail
+    version: "6.17.1"
+    installed: {{ .Values.apps.loki.enabled }}
+    createNamespace: true
+    {{- if .Values.apps.loki.enabled }}
+    needs:
+      - observability/loki
+    {{- end }}
+    values:
+      - values/apps/promtail.yaml
+      - config:
+          clients:
+            - url: http://loki.{{ .Values.apps.loki.namespace }}.svc:3100/loki/api/v1/push
+
+  - name: pyroscope
+    namespace: {{ .Values.apps.pyroscope.namespace }}
+    chart: grafana/pyroscope
+    version: {{ .Values.apps.pyroscope.version | quote }}
+    installed: {{ .Values.apps.pyroscope.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/pyroscope.yaml
+
+  - name: beyla
+    namespace: {{ .Values.apps.beyla.namespace }}
+    chart: grafana/beyla
+    version: {{ .Values.apps.beyla.version | quote }}
+    installed: {{ .Values.apps.beyla.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/beyla.yaml
+
+  - name: istio-base
+    namespace: {{ .Values.apps.istio.namespace }}
+    chart: istio/base
+    version: {{ .Values.apps.istio.version | quote }}
+    installed: {{ .Values.apps.istio.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/istio-base.yaml
+
+  - name: istiod
+    namespace: {{ .Values.apps.istio.namespace }}
+    chart: istio/istiod
+    version: {{ .Values.apps.istio.version | quote }}
+    installed: {{ .Values.apps.istio.enabled }}
+    createNamespace: true
+    wait: true
+    timeout: 600
+    {{- if .Values.apps.istio.enabled }}
+    needs:
+      - istio-system/istio-base
+    {{- end }}
+    values:
+      - values/apps/istiod.yaml
+
   - name: headlamp
     namespace: {{ .Values.apps.headlamp.namespace }}
     chart: headlamp/headlamp
@@ -67,6 +289,161 @@ releases:
     createNamespace: true
     values:
       - values/apps/headlamp.yaml
+
+  # Chart index on charts.cillian.website is still 1.0.0; image tags in values/apps/cilikube.yaml track app v1.5.0.
+  - name: cilikube
+    namespace: {{ .Values.apps.cilikube.namespace }}
+    chart: ciliverse/cilikube
+    version: {{ .Values.apps.cilikube.version | quote }}
+    installed: {{ .Values.apps.cilikube.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/cilikube.yaml
+      - path: values/private.yaml
+        missingFileHandler: Warn
+
+  - name: local-path-provisioner
+    namespace: {{ .Values.apps.localPathProvisioner.namespace }}
+    chart: containeroo/local-path-provisioner
+    version: {{ .Values.apps.localPathProvisioner.version | quote }}
+    installed: {{ .Values.apps.localPathProvisioner.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/local-path-provisioner.yaml
+
+  - name: metallb
+    namespace: {{ .Values.apps.metallb.namespace }}
+    chart: metallb/metallb
+    version: {{ .Values.apps.metallb.version | quote }}
+    installed: {{ .Values.apps.metallb.enabled }}
+    createNamespace: true
+    wait: true
+    timeout: 600
+    values:
+      - values/apps/metallb.yaml
+
+  - name: metrics-server
+    namespace: {{ .Values.apps.metricsServer.namespace }}
+    chart: metrics-server/metrics-server
+    version: {{ .Values.apps.metricsServer.version | quote }}
+    installed: {{ .Values.apps.metricsServer.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/metrics-server.yaml
+
+  - name: cert-manager
+    namespace: {{ .Values.apps.certManager.namespace }}
+    chart: jetstack/cert-manager
+    version: {{ .Values.apps.certManager.version | quote }}
+    installed: {{ .Values.apps.certManager.enabled }}
+    createNamespace: true
+    wait: true
+    timeout: 600
+    values:
+      - values/apps/cert-manager.yaml
+
+  - name: platform-config
+    namespace: platform-config
+    chart: ./charts/platform-config
+    installed: {{ or .Values.apps.metallb.enabled .Values.apps.certManager.enabled }}
+    createNamespace: true
+    {{- if or .Values.apps.metallb.enabled .Values.apps.certManager.enabled }}
+    needs:
+      {{- if .Values.apps.metallb.enabled }}
+      - metallb-system/metallb
+      {{- end }}
+      {{- if .Values.apps.certManager.enabled }}
+      - cert-manager/cert-manager
+      {{- end }}
+    {{- end }}
+    values:
+      - values/apps/platform-config.yaml
+      - metallb:
+          enabled: {{ .Values.apps.metallb.enabled }}
+          addresses: {{ dig "metallb" "addresses" "" .Values | quote }}
+        certManager:
+          enabled: {{ .Values.apps.certManager.enabled }}
+        letsencrypt:
+          enabled: {{ .Values.letsencrypt.enabled | default false }}
+          email: {{ dig "letsencrypt" "email" "" .Values | quote }}
+        exampleIngress:
+          enabled: {{ .Values.exampleIngress.enabled | default false }}
+          clusterIssuer: {{ if .Values.letsencrypt.enabled }}letsencrypt-prod{{ else }}selfsigned{{ end }}
+          cilikube:
+            host: {{ dig "hosts" "cilikube" "" .Values | quote }}
+          grafana:
+            host: {{ dig "hosts" "grafana" "" .Values | quote }}
+
+  - name: apisix
+    namespace: {{ .Values.apps.apisix.namespace }}
+    chart: apisix/apisix
+    version: {{ .Values.apps.apisix.version | quote }}
+    installed: {{ .Values.apps.apisix.enabled }}
+    createNamespace: true
+    {{- if .Values.apps.metallb.enabled }}
+    needs:
+      - metallb-system/metallb
+    {{- end }}
+    values:
+      - values/apps/apisix.yaml
+      {{- if eq .Environment.Name "kind" }}
+      - values/kind/apisix.yaml
+      {{- end }}
+
+  - name: gateway-api
+    namespace: {{ .Values.apps.gatewayApi.namespace }}
+    chart: oci://docker.io/envoyproxy/gateway-crds-helm
+    version: {{ .Values.apps.gatewayApi.version | quote }}
+    installed: {{ or .Values.apps.gatewayApi.enabled .Values.apps.envoyGateway.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/gateway-api.yaml
+      - crds:
+          envoyGateway:
+            enabled: {{ .Values.apps.envoyGateway.enabled }}
+
+  - name: envoy-gateway
+    namespace: {{ .Values.apps.envoyGateway.namespace }}
+    chart: oci://docker.io/envoyproxy/gateway-helm
+    version: {{ .Values.apps.envoyGateway.version | quote }}
+    installed: {{ .Values.apps.envoyGateway.enabled }}
+    createNamespace: true
+    wait: true
+    timeout: 600
+    {{- if .Values.apps.envoyGateway.enabled }}
+    needs:
+      - envoy-gateway-system/gateway-api
+    {{- end }}
+    values:
+      - values/apps/envoy-gateway.yaml
+
+  - name: external-dns
+    namespace: {{ .Values.apps.externalDns.namespace }}
+    chart: external-dns/external-dns
+    version: {{ .Values.apps.externalDns.version | quote }}
+    installed: {{ .Values.apps.externalDns.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/external-dns.yaml
+      - provider:
+          name: {{ dig "externalDns" "provider" "" .Values | quote }}
+        txtOwnerId: {{ dig "externalDns" "txtOwnerId" "helm-charts" .Values | quote }}
+        domainFilters: {{ dig "externalDns" "domainFilters" list .Values | toJson }}
+        {{- if or .Values.apps.gatewayApi.enabled .Values.apps.envoyGateway.enabled }}
+        sources:
+          - service
+          - ingress
+          - gateway-httproute
+        {{- else }}
+        sources:
+          - service
+          - ingress
+        {{- end }}
+        {{- if eq (dig "externalDns" "provider" "" .Values) "cloudflare" }}
+        env:
+          - name: CF_API_TOKEN
+            value: {{ dig "externalDns" "cloudflareApiToken" "" .Values | quote }}
+        {{- end }}
 
   - name: argo-cd
     namespace: {{ .Values.apps.argoCd.namespace }}
@@ -86,6 +463,22 @@ releases:
     values:
       - values/apps/flux2.yaml
 
+  - name: flux-gitops
+    namespace: flux-system
+    chart: ./charts/flux-gitops
+    installed: {{ .Values.fluxGitops.enabled | default false }}
+    createNamespace: true
+    needs:
+      - flux-system/flux2
+    values:
+      - source:
+          name: {{ dig "fluxGitops" "sourceName" "gitops" .Values | quote }}
+          url: {{ dig "fluxGitops" "gitUrl" "" .Values | quote }}
+          branch: {{ dig "fluxGitops" "branch" "main" .Values | quote }}
+          password: {{ dig "fluxGitops" "deployToken" "" .Values | quote }}
+        kustomizations:
+{{ dig "fluxGitops" "kustomizations" (list) .Values | toYaml | indent 10 }}
+
   - name: gitlab
     namespace: {{ .Values.apps.gitlab.namespace }}
     chart: gitlab/gitlab
@@ -94,6 +487,19 @@ releases:
     createNamespace: true
     values:
       - values/apps/gitlab.yaml
+      - registry:
+          enabled: {{ not .Values.apps.harbor.enabled }}
+
+  - name: gitlab-runner
+    namespace: {{ .Values.apps.gitlabRunner.namespace }}
+    chart: gitlab/gitlab-runner
+    version: {{ .Values.apps.gitlabRunner.version | quote }}
+    installed: {{ .Values.apps.gitlabRunner.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/gitlab-runner.yaml
+      - gitlabUrl: {{ dig "gitlabRunner" "gitlabUrl" "" .Values | quote }}
+        runnerToken: {{ dig "gitlabRunner" "runnerToken" "" .Values | quote }}
 
   - name: jenkins
     namespace: {{ .Values.apps.jenkins.namespace }}
@@ -103,6 +509,16 @@ releases:
     createNamespace: true
     values:
       - values/apps/jenkins.yaml
+
+  - name: harbor
+    namespace: {{ .Values.apps.harbor.namespace }}
+    chart: harbor/harbor
+    version: {{ .Values.apps.harbor.version | quote }}
+    installed: {{ .Values.apps.harbor.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/harbor.yaml
+      - harborAdminPassword: {{ dig "harbor" "adminPassword" "" .Values | quote }}
 
   - name: postgresql
     namespace: {{ .Values.apps.postgresql.namespace }}
@@ -121,3 +537,75 @@ releases:
     createNamespace: true
     values:
       - values/apps/redis.yaml
+      - auth:
+          password: {{ dig "redis" "password" "" .Values | quote }}
+
+  - name: rustfs
+    namespace: {{ .Values.apps.rustfs.namespace }}
+    chart: rustfs/rustfs
+    version: {{ .Values.apps.rustfs.version | quote }}
+    installed: {{ .Values.apps.rustfs.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/rustfs.yaml
+      - secret:
+          rustfs:
+            access_key: {{ dig "rustfs" "accessKey" "" .Values | quote }}
+            secret_key: {{ dig "rustfs" "secretKey" "" .Values | quote }}
+
+  - name: minio
+    namespace: {{ .Values.apps.minio.namespace }}
+    chart: minio/minio
+    version: {{ .Values.apps.minio.version | quote }}
+    installed: {{ .Values.apps.minio.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/minio.yaml
+      - rootUser: {{ dig "minio" "rootUser" "" .Values | quote }}
+        rootPassword: {{ dig "minio" "rootPassword" "" .Values | quote }}
+
+  - name: juicefs-csi-driver
+    namespace: {{ .Values.apps.juicefsCsi.namespace }}
+    chart: juicefs/juicefs-csi-driver
+    version: {{ .Values.apps.juicefsCsi.version | quote }}
+    installed: {{ .Values.apps.juicefsCsi.enabled }}
+    createNamespace: true
+    {{- if .Values.apps.juicefsCsi.enabled }}
+    needs:
+      - redis/redis
+      {{- if .Values.apps.rustfs.enabled }}
+      - rustfs/rustfs
+      {{- else if .Values.apps.minio.enabled }}
+      - minio/minio
+      {{- end }}
+    {{- end }}
+    values:
+      - values/apps/juicefs-csi-driver.yaml
+      {{- if .Values.apps.juicefsCsi.enabled }}
+      - storageClasses:
+          - name: juicefs
+            enabled: true
+            reclaimPolicy: Delete
+            backend:
+              name: {{ dig "juicefs" "name" "jfs" .Values | quote }}
+              metaurl: {{ printf "redis://:%s@redis-master.redis.svc:6379/1" (dig "redis" "password" "" .Values) | quote }}
+              storage: minio
+              {{- if .Values.apps.rustfs.enabled }}
+              bucket: {{ printf "http://rustfs-svc.rustfs.svc:9000/%s" (dig "juicefs" "name" "jfs" .Values) | quote }}
+              accessKey: {{ dig "rustfs" "accessKey" "" .Values | quote }}
+              secretKey: {{ dig "rustfs" "secretKey" "" .Values | quote }}
+              {{- else }}
+              bucket: {{ printf "http://minio.minio.svc:9000/%s" (dig "juicefs" "name" "jfs" .Values) | quote }}
+              accessKey: {{ dig "minio" "rootUser" "" .Values | quote }}
+              secretKey: {{ dig "minio" "rootPassword" "" .Values | quote }}
+              {{- end }}
+      {{- end }}
+
+  - name: nats
+    namespace: {{ .Values.apps.nats.namespace }}
+    chart: nats/nats
+    version: {{ .Values.apps.nats.version | quote }}
+    installed: {{ .Values.apps.nats.enabled }}
+    createNamespace: true
+    values:
+      - values/apps/nats.yaml

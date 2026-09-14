@@ -1,0 +1,7 @@
+# Sync Ingress / Service (and Gateway HTTPRoute when Gateway API is on) to DNS.
+# Default: disabled. provider.name / domainFilters / token come from private.yaml.
+policy: upsert-only
+sources:
+  - service
+  - ingress
+txtOwnerId: helm-charts
