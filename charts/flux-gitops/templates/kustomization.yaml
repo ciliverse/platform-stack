@@ -1,0 +1,31 @@
+{{- $sourceName := .Values.source.name -}}
+{{- $sourceNS := .Release.Namespace -}}
+{{- range .Values.kustomizations }}
+{{- if not .name }}{{ fail "flux-gitops: every kustomizations entry needs a name" }}{{ end }}
+{{- if not .path }}{{ fail (printf "flux-gitops: kustomization %q needs a path" .name) }}{{ end }}
+{{- $ns := .namespace | default $sourceNS }}
+{{- if and .createNamespace (ne $ns $sourceNS) }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $ns }}
+{{- end }}
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: {{ .name }}
+  namespace: {{ $ns }}
+spec:
+  interval: {{ .interval | default "5m" }}
+  path: {{ .path | quote }}
+  prune: {{ if hasKey . "prune" }}{{ .prune }}{{ else }}true{{ end }}
+  {{- with .targetNamespace }}
+  targetNamespace: {{ . }}
+  {{- end }}
+  sourceRef:
+    kind: GitRepository
+    name: {{ $sourceName }}
+    namespace: {{ $sourceNS }}
+{{- end }}

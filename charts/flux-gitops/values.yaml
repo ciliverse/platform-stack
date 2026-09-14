@@ -1,0 +1,30 @@
+# Flux is installed by the flux2 release; this chart only tells it what to
+# watch. Set source.url and one kustomizations entry, or the chart renders
+# nothing useful.
+
+source:
+  # Name of the GitRepository object. Kustomizations reference it by this name.
+  name: gitops
+  url: ""
+  branch: main
+  interval: 1m
+  # Basic-auth credentials for a private repo. A read-only token is enough;
+  # leave password empty for a public repo and no Secret is created.
+  username: git
+  password: ""
+
+# One entry per directory Flux should apply. Empty means the repository gets
+# fetched but nothing is applied.
+kustomizations: []
+  # - name: demo
+  #   path: ./apps/demo
+  #   interval: 5m
+  #   # prune deletes cluster objects when they leave the kustomization.
+  #   prune: true
+  #   # Namespace holding the Kustomization object. Defaults to the release
+  #   # namespace; anywhere else is a cross-namespace sourceRef, which a Flux
+  #   # started with --no-cross-namespace-refs will refuse.
+  #   namespace: ""
+  #   createNamespace: false
+  #   # spec.targetNamespace: where manifests without a namespace land.
+  #   targetNamespace: ""

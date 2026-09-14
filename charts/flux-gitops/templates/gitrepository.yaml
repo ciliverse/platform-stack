@@ -1,0 +1,17 @@
+{{- if not .Values.source.url }}
+{{- fail "flux-gitops: set source.url to the repository Flux should track" }}
+{{- end }}
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: {{ .Values.source.name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  interval: {{ .Values.source.interval | default "1m" }}
+  url: {{ .Values.source.url | quote }}
+  ref:
+    branch: {{ .Values.source.branch | default "main" | quote }}
+  {{- if .Values.source.password }}
+  secretRef:
+    name: {{ .Values.source.name }}-auth
+  {{- end }}

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: flux-gitops
+description: One Flux GitRepository plus the Kustomizations that read from it
+type: application
+version: 0.2.0
+appVersion: "0.2.0"
