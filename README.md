@@ -151,6 +151,12 @@ cp values/private.yaml.example values/private.yaml
 kubectl -n apisix get svc apisix-gateway
 ```
 
+`EXTERNAL-IP` 就是 MetalLB 从 `metallb.addresses` 里分的 VIP，域名解析到它即可省掉 NodePort 端口号。两点容易卡住：
+
+- 地址段要在节点**二层可达**的那张网卡所在子网里，并且从 DHCP 池里排除掉，否则 VIP 分得出来却没人应答 ARP
+- 节点是虚机时，宿主机虚拟交换机的混杂模式 / MAC 变更 / 伪传输策略可能拦掉 L2 广播，表现同样是 VIP 通不了
+- MetalLB 镜像在 quay.io，拉不动就按 [`values/apps/metallb.yaml`](values/apps/metallb.yaml) 换镜像站
+
 公网 Let's Encrypt（VIP 的 80 端口须从互联网可达，且已填写 `letsencrypt.email`）：
 
 ```bash

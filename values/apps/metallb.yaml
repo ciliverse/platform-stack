@@ -1,1 +1,10 @@
 # MetalLB L2. Address pool is rendered by charts/platform-config from private.yaml.
+#
+# Upstream images live on quay.io. Networks that cannot reach it need a mirror;
+# point both repositories at one, or drop this block to pull from quay.io.
+controller:
+  image:
+    repository: quay.m.daocloud.io/metallb/controller
+speaker:
+  image:
+    repository: quay.m.daocloud.io/metallb/speaker
