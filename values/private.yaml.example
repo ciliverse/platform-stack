@@ -7,12 +7,20 @@
 # Default env (MetalLB on): metallb.addresses MUST be a real L2 range on the
 # LAN, not the placeholder below, or helmfile template/apply fails.
 
+# Required as long as apps.cilikube is on (it is, by default): the app refuses
+# the chart's placeholder values at startup, so helmfile fails until these are
+# real. Both are rejected while they still start with REPLACE_ME.
 secrets:
   jwtSecret: "REPLACE_ME_GENERATE_WITH_openssl_rand"
   encryptionKey: "REPLACE_ME_32_CHARS_openssl_hex16"
 
 metallb:
   addresses: "192.168.0.0-192.168.0.0"
+
+# Class for the example Ingresses and the ACME http01 solver. APISIX serves
+# Ingress; Envoy Gateway does not (Gateway API only), so if APISIX is off this
+# has to name a controller that is actually running.
+ingressClass: apisix
 
 letsencrypt:
   email: ""
@@ -55,6 +63,26 @@ harbor:
 gitlabRunner:
   gitlabUrl: ""
   runnerToken: ""
+
+# Only when apps.gitlab is on. Chart 10.x bundles no database, cache or object
+# storage: psqlHost / redisHost default to this repo's own postgresql / redis
+# releases when those are enabled, otherwise point them at something external.
+# The Secrets named below are NOT created by this repo — create them in the
+# GitLab namespace first (README: GitLab). Defaults shown; omit to accept them.
+gitlab:
+  domain: ""                     # required; every GitLab URL is built from it
+  psqlHost: ""                   # empty + apps.postgresql on -> postgresql.<ns>.svc
+  psqlUsername: gitlab
+  psqlDatabase: gitlabhq_production
+  psqlPasswordSecret: gitlab-psql            # key: password
+  redisHost: ""                  # empty + apps.redis on -> redis-master.<ns>.svc
+  redisPasswordSecret: gitlab-redis          # key: redis-password
+  objectStorageSecret: gitlab-object-storage # key: connection
+  registryStorageSecret: gitlab-registry-storage  # key: config
+  backupConfigSecret: gitlab-s3cmd           # key: config
+  registryBucket: gitlab-registry
+  backupBucket: gitlab-backups
+  backupTmpBucket: gitlab-backups-tmp
 
 externalDns:
   provider: ""

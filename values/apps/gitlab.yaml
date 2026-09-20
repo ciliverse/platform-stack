@@ -1,5 +1,21 @@
 # Default: disabled. Registry is on when this release is enabled; if Harbor
 # is also enabled, helmfile turns GitLab Registry off (CI should push to one).
 # Put secrets in values/private.yaml (gitignored), not here.
+#
+# Since chart 10.0 the chart bundles no PostgreSQL, no Redis and no object
+# storage, and it refuses to render without them. Addresses and Secret names
+# come from values/private.yaml through helmfile; the Secrets themselves must
+# exist in the namespace before install (README: GitLab).
+#
+# Both certmanager switches are off because this repo installs cert-manager on
+# its own and ships the ClusterIssuers in charts/platform-config. Leaving
+# either on makes the bundled certmanager-issuer subchart demand its own ACME
+# email, which is a second, conflicting source of truth for certificates.
+global:
+  ingress:
+    configureCertmanager: false
+  gatewayApi:
+    configureCertmanager: false
+
 registry:
   enabled: true

@@ -16,6 +16,9 @@ letsencrypt:
 exampleIngress:
   enabled: false
   clusterIssuer: selfsigned
+  # Must be a class some running controller serves. Envoy Gateway does not
+  # serve Ingress objects, only Gateway API ones.
+  ingressClass: apisix
   cilikube:
     enabled: true
     namespace: cilikube

@@ -114,6 +114,10 @@ apps:
     enabled: false
     version: "6.55.0"
     namespace: observability
+  # Ships container logs to Loki. Installed with loki and into loki's
+  # namespace, so it has no switch of its own — only a version to track.
+  promtail:
+    version: "6.17.1"
   pyroscope:
     enabled: true
     version: "2.3.1"

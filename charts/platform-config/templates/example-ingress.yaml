@@ -9,7 +9,7 @@ metadata:
   annotations:
     cert-manager.io/cluster-issuer: {{ $issuer | quote }}
 spec:
-  ingressClassName: apisix
+  ingressClassName: {{ .Values.exampleIngress.ingressClass }}
   tls:
     - hosts:
         - {{ .Values.exampleIngress.cilikube.host | quote }}
@@ -36,7 +36,7 @@ metadata:
   annotations:
     cert-manager.io/cluster-issuer: {{ $issuer | quote }}
 spec:
-  ingressClassName: apisix
+  ingressClassName: {{ .Values.exampleIngress.ingressClass }}
   tls:
     - hosts:
         - {{ .Values.exampleIngress.grafana.host | quote }}

@@ -46,6 +46,7 @@ search = {
     "victoriaLogsCollector": "vm/victoria-logs-collector",
     "victoriaMetrics": "vm/victoria-metrics-single",
     "loki": "grafana/loki",
+    "promtail": "grafana/promtail",
     "pyroscope": "grafana/pyroscope",
     "beyla": "grafana/beyla",
     "istio": "istio/istiod",

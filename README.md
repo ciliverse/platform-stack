@@ -75,9 +75,31 @@ fluxGitops:
 | 集群管理 | CiliKube | 看节点和工作负载 | 开 |
 | 集群管理 | Headlamp | 看节点和工作负载 | 开 |
 
-业务入口默认用 Ingress：`ingressClassName: apisix`，证书注解 `cert-manager.io/cluster-issuer: selfsigned`（公网改 `letsencrypt-prod`）。备选是 **Gateway API**：先开 `gatewayApi`（只装 CRD）或直接开 `envoyGateway`（CRD + 控制器）。HTTPRoute 用 GatewayClass `eg`。南北流量选一个当主（APISIX 或 Envoy Gateway），不要两个一起当主入口。Istio 只做 sidecar，不提供对外 Ingress。
+业务入口默认用 Ingress，class 取 `private.yaml` 的 `ingressClass`（默认 `apisix`），证书注解 `cert-manager.io/cluster-issuer: selfsigned`（公网改 `letsencrypt-prod`）。备选是 **Gateway API**：先开 `gatewayApi`（只装 CRD）或直接开 `envoyGateway`（CRD + 控制器）。HTTPRoute 用 GatewayClass `eg`。南北流量选一个当主（APISIX 或 Envoy Gateway），不要两个一起当主入口。Istio 只做 sidecar，不提供对外 Ingress。
+
+**Envoy Gateway 不处理 Ingress 对象**，它只实现 Gateway API。所以关掉 APISIX 时，示例 Ingress 和 Let's Encrypt 的 http01 挑战都会指向一个没人接管的 class；这种组合 helmfile 直接 fail，要么开着 APISIX，要么把 `ingressClass` 改成实际在跑的控制器。
 
 CI 把镜像推到 **GitLab Registry** 或 **Harbor**，不要两个都当主仓库。开 Harbor 时，清单会关掉 GitLab 自带 Registry。Harbor 默认 ClusterIP（`http://harbor.harbor.svc`），需要域名时再改 Ingress。
+
+### GitLab 的外部依赖
+
+**chart 10.x 不再自带 PostgreSQL、Redis 和对象存储**，缺一个就连渲染都过不去。所以 `apps.gitlab.enabled: true` 之外还要：
+
+- `gitlab.domain`：必填，GitLab 的所有 URL 由它拼出来
+- 数据库和缓存：开着本仓的 `postgresql` / `redis` 就自动指向 `postgresql.<ns>.svc` 和 `redis-master.<ns>.svc`；用外部实例就填 `gitlab.psqlHost` / `gitlab.redisHost`
+- **本仓不会替你建这些 Secret**，install 前先在 GitLab 的命名空间里建好（名字可在 `private.yaml` 改）：
+
+| Secret | key | 内容 |
+| --- | --- | --- |
+| `gitlab-psql` | `password` | 数据库用户 `gitlab` 的口令 |
+| `gitlab-redis` | `redis-password` | Redis 口令 |
+| `gitlab-object-storage` | `connection` | Rails 的对象存储连接（YAML） |
+| `gitlab-registry-storage` | `config` | Registry 后端配置（开 Harbor 时用不到） |
+| `gitlab-s3cmd` | `config` | 备份用的 s3cmd 配置 |
+
+数据库里的 `gitlab` 用户和 `gitlabhq_production` 库也要自己建——本仓的 `postgresql` release 是通用的，不会为 GitLab 预置。
+
+GitLab 自带的 cert-manager 与 issuer 在 `values/apps/gitlab.yaml` 里关掉了：本仓单独装 cert-manager，ClusterIssuer 由 `charts/platform-config` 提供，两边都开会变成两个证书来源。
 
 GitLab CI 要在集群里跑 job，还要单独开 `gitlabRunner`（只开 GitLab 不会装 Runner）。在 `private.yaml` 填 `gitlabUrl`（带 `https://`）和 `runnerToken`。token 从 GitLab 里已注册的 runner 拿，不是旧的 registration token。
 
@@ -99,7 +121,8 @@ CiliKube 公开 index 上的 chart 版本是 **1.0.0**，镜像 tag 在 `values/
 - 可选：`helm plugin install https://github.com/databus23/helm-diff`
 - `cp values/private.yaml.example values/private.yaml`，并填写：
   - `metallb.addresses`：节点二层网一段空闲地址，例如 `192.168.1.240-192.168.1.250`。占位 `192.168.0.0-192.168.0.0` 会让 template/apply 失败
-  - CiliKube：`openssl rand -hex 16` 生成 `jwtSecret`（≥16）和 `encryptionKey`（恰好 32 字符）
+  - CiliKube：`openssl rand -hex 16` 生成 `jwtSecret`（≥16）和 `encryptionKey`（恰好 32 字符）。CiliKube 默认开着，而它启动时会拒绝 chart 自带的占位值，所以这两项不填 helmfile 就 fail
+  - 若开启 GitLab：`gitlab.domain`，以及上面「GitLab 的外部依赖」列的库、缓存和 Secret
   - 若开启 Redis / JuiceFS：`redis.password`（建议 hex）
   - 若开启 RustFS / MinIO：access/secret，不要用上游默认口令
   - 若开启 Harbor：`harbor.adminPassword`，不要用 `Harbor12345`
@@ -114,7 +137,8 @@ CiliKube 公开 index 上的 chart 版本是 **1.0.0**，镜像 tag 在 `values/
 git clone <this-repo>
 cd platform-stack
 cp values/private.yaml.example values/private.yaml
-# 填写 metallb.addresses 和 CiliKube 密钥
+# 至少填 metallb.addresses 和 CiliKube 的 jwtSecret / encryptionKey，
+# 否则 template / apply 会带着具体缺哪一项的提示直接失败
 # 需要提交即部署：打开 gitlab（GitLab CI + Registry）+ gitlabRunner，或 jenkins + harbor，以及 argoCd 或 flux2
 ./scripts/apply.sh
 ```

@@ -1,15 +1,18 @@
+# missingFileHandler belongs next to `values:`, not inside the list. A map in
+# the list is inline values, so `- path: values/private.yaml` would read as two
+# state values named path and missingFileHandler and the file would never load.
 environments:
   default:
+    missingFileHandler: Warn
     values:
       - values/defaults.yaml
-      - path: values/private.yaml
-        missingFileHandler: Warn
+      - values/private.yaml
   kind:
+    missingFileHandler: Warn
     values:
       - values/defaults.yaml
       - values/kind.yaml
-      - path: values/private.yaml
-        missingFileHandler: Warn
+      - values/private.yaml
 ---
 {{- if .Values.apps.victoriaLogsCollector.enabled }}
 {{- if not .Values.apps.victoriaLogs.enabled }}
@@ -35,6 +38,40 @@ environments:
 {{- $rp := dig "redis" "password" "" .Values }}
 {{- if not $rp }}
 {{- fail "set redis.password in values/private.yaml" }}
+{{- end }}
+{{- end }}
+{{/*
+GitLab 10.x renders only with an external database, cache and object store.
+Default to this repo's own postgresql / redis releases when they are on, so the
+common case needs one line (gitlab.domain) in private.yaml.
+*/}}
+{{- $glPsql := dig "gitlab" "psqlHost" "" .Values }}
+{{- if and (not $glPsql) .Values.apps.postgresql.enabled }}
+{{- $glPsql = printf "postgresql.%s.svc" .Values.apps.postgresql.namespace }}
+{{- end }}
+{{- $glRedis := dig "gitlab" "redisHost" "" .Values }}
+{{- if and (not $glRedis) .Values.apps.redis.enabled }}
+{{- $glRedis = printf "redis-master.%s.svc" .Values.apps.redis.namespace }}
+{{- end }}
+{{- if .Values.apps.gitlab.enabled }}
+{{- if not (dig "gitlab" "domain" "" .Values) }}
+{{- fail "gitlab.enabled requires gitlab.domain in values/private.yaml (GitLab builds every URL from it)" }}
+{{- end }}
+{{- if not $glPsql }}
+{{- fail "gitlab.enabled requires an external PostgreSQL: enable apps.postgresql or set gitlab.psqlHost in values/private.yaml (chart 10.x bundles none)" }}
+{{- end }}
+{{- if not $glRedis }}
+{{- fail "gitlab.enabled requires an external Redis: enable apps.redis or set gitlab.redisHost in values/private.yaml (chart 10.x bundles none)" }}
+{{- end }}
+{{- end }}
+{{- if .Values.apps.cilikube.enabled }}
+{{- $js := dig "secrets" "jwtSecret" "" .Values }}
+{{- $ek := dig "secrets" "encryptionKey" "" .Values }}
+{{- if or (lt (len $js) 16) (hasPrefix "REPLACE_ME" $js) }}
+{{- fail "cilikube requires secrets.jwtSecret in values/private.yaml (>=16 chars; the app refuses the chart default at startup)" }}
+{{- end }}
+{{- if or (ne (len $ek) 32) (hasPrefix "REPLACE_ME" $ek) }}
+{{- fail "cilikube requires secrets.encryptionKey in values/private.yaml (exactly 32 chars; the app refuses the chart default at startup)" }}
 {{- end }}
 {{- end }}
 {{- if .Values.apps.metallb.enabled }}
@@ -99,6 +136,32 @@ environments:
 {{- if and (eq $ch "") (eq $gh "") }}
 {{- fail "exampleIngress.enabled requires hosts.cilikube or hosts.grafana in values/private.yaml" }}
 {{- end }}
+{{- end }}
+{{/*
+The example Ingresses and the ACME http01 solver both need a class that some
+controller actually serves. Envoy Gateway implements Gateway API only and
+ignores Ingress objects, so picking it as the entry means setting ingressClass.
+*/}}
+{{- $ingressClass := dig "ingressClass" "apisix" .Values }}
+{{- if and (or .Values.exampleIngress.enabled (.Values.letsencrypt.enabled | default false)) (eq $ingressClass "apisix") (not .Values.apps.apisix.enabled) }}
+{{- fail "ingressClass is apisix but apps.apisix is disabled; enable APISIX or set ingressClass in values/private.yaml to a class a running controller serves" }}
+{{- end }}
+{{/*
+platform-config writes Ingresses into other releases' namespaces, so it has to
+run after the releases that create them.
+*/}}
+{{- $pcNeeds := list }}
+{{- if .Values.apps.metallb.enabled }}
+{{- $pcNeeds = append $pcNeeds (printf "%s/metallb" .Values.apps.metallb.namespace) }}
+{{- end }}
+{{- if .Values.apps.certManager.enabled }}
+{{- $pcNeeds = append $pcNeeds (printf "%s/cert-manager" .Values.apps.certManager.namespace) }}
+{{- end }}
+{{- if and .Values.exampleIngress.enabled .Values.apps.cilikube.enabled (dig "hosts" "cilikube" "" .Values) }}
+{{- $pcNeeds = append $pcNeeds (printf "%s/cilikube" .Values.apps.cilikube.namespace) }}
+{{- end }}
+{{- if and .Values.exampleIngress.enabled .Values.apps.kubePrometheusStack.enabled (dig "hosts" "grafana" "" .Values) }}
+{{- $pcNeeds = append $pcNeeds (printf "%s/kube-prometheus-stack" .Values.apps.kubePrometheusStack.namespace) }}
 {{- end }}
 
 repositories:
@@ -198,7 +261,7 @@ releases:
     createNamespace: true
     {{- if .Values.apps.victoriaLogsCollector.enabled }}
     needs:
-      - observability/victoria-logs-single
+      - {{ .Values.apps.victoriaLogs.namespace }}/victoria-logs-single
     {{- end }}
     values:
       - values/apps/victoria-logs-collector.yaml
@@ -226,12 +289,12 @@ releases:
   - name: promtail
     namespace: {{ .Values.apps.loki.namespace }}
     chart: grafana/promtail
-    version: "6.17.1"
+    version: {{ .Values.apps.promtail.version | quote }}
     installed: {{ .Values.apps.loki.enabled }}
     createNamespace: true
     {{- if .Values.apps.loki.enabled }}
     needs:
-      - observability/loki
+      - {{ .Values.apps.loki.namespace }}/loki
     {{- end }}
     values:
       - values/apps/promtail.yaml
@@ -276,7 +339,7 @@ releases:
     timeout: 600
     {{- if .Values.apps.istio.enabled }}
     needs:
-      - istio-system/istio-base
+      - {{ .Values.apps.istio.namespace }}/istio-base
     {{- end }}
     values:
       - values/apps/istiod.yaml
@@ -299,8 +362,12 @@ releases:
     createNamespace: true
     values:
       - values/apps/cilikube.yaml
-      - path: values/private.yaml
-        missingFileHandler: Warn
+      # A map under a release's `values:` is inline values, not a file
+      # reference, so `- path: values/private.yaml` would hand the chart two
+      # junk keys and no secrets. Pass the two keys the chart needs.
+      - secrets:
+          jwtSecret: {{ dig "secrets" "jwtSecret" "" .Values | quote }}
+          encryptionKey: {{ dig "secrets" "encryptionKey" "" .Values | quote }}
 
   - name: local-path-provisioner
     namespace: {{ .Values.apps.localPathProvisioner.namespace }}
@@ -347,13 +414,10 @@ releases:
     chart: ./charts/platform-config
     installed: {{ or .Values.apps.metallb.enabled .Values.apps.certManager.enabled }}
     createNamespace: true
-    {{- if or .Values.apps.metallb.enabled .Values.apps.certManager.enabled }}
+    {{- with $pcNeeds }}
     needs:
-      {{- if .Values.apps.metallb.enabled }}
-      - metallb-system/metallb
-      {{- end }}
-      {{- if .Values.apps.certManager.enabled }}
-      - cert-manager/cert-manager
+      {{- range . }}
+      - {{ . }}
       {{- end }}
     {{- end }}
     values:
@@ -361,17 +425,23 @@ releases:
       - metallb:
           enabled: {{ .Values.apps.metallb.enabled }}
           addresses: {{ dig "metallb" "addresses" "" .Values | quote }}
+          # The pool only counts when it sits in MetalLB's own namespace.
+          namespace: {{ .Values.apps.metallb.namespace }}
         certManager:
           enabled: {{ .Values.apps.certManager.enabled }}
         letsencrypt:
           enabled: {{ .Values.letsencrypt.enabled | default false }}
           email: {{ dig "letsencrypt" "email" "" .Values | quote }}
+          ingressClass: {{ $ingressClass | quote }}
         exampleIngress:
           enabled: {{ .Values.exampleIngress.enabled | default false }}
           clusterIssuer: {{ if .Values.letsencrypt.enabled }}letsencrypt-prod{{ else }}selfsigned{{ end }}
+          ingressClass: {{ $ingressClass | quote }}
           cilikube:
+            namespace: {{ .Values.apps.cilikube.namespace }}
             host: {{ dig "hosts" "cilikube" "" .Values | quote }}
           grafana:
+            namespace: {{ .Values.apps.kubePrometheusStack.namespace }}
             host: {{ dig "hosts" "grafana" "" .Values | quote }}
 
   - name: apisix
@@ -382,7 +452,7 @@ releases:
     createNamespace: true
     {{- if .Values.apps.metallb.enabled }}
     needs:
-      - metallb-system/metallb
+      - {{ .Values.apps.metallb.namespace }}/metallb
     {{- end }}
     values:
       - values/apps/apisix.yaml
@@ -412,7 +482,7 @@ releases:
     timeout: 600
     {{- if .Values.apps.envoyGateway.enabled }}
     needs:
-      - envoy-gateway-system/gateway-api
+      - {{ .Values.apps.gatewayApi.namespace }}/gateway-api
     {{- end }}
     values:
       - values/apps/envoy-gateway.yaml
@@ -464,12 +534,12 @@ releases:
       - values/apps/flux2.yaml
 
   - name: flux-gitops
-    namespace: flux-system
+    namespace: {{ .Values.apps.flux2.namespace }}
     chart: ./charts/flux-gitops
     installed: {{ .Values.fluxGitops.enabled | default false }}
     createNamespace: true
     needs:
-      - flux-system/flux2
+      - {{ .Values.apps.flux2.namespace }}/flux2
     values:
       - source:
           name: {{ dig "fluxGitops" "sourceName" "gitops" .Values | quote }}
@@ -489,6 +559,45 @@ releases:
       - values/apps/gitlab.yaml
       - registry:
           enabled: {{ not .Values.apps.harbor.enabled }}
+          storage:
+            secret: {{ dig "gitlab" "registryStorageSecret" "gitlab-registry-storage" .Values | quote }}
+            key: config
+        global:
+          hosts:
+            domain: {{ dig "gitlab" "domain" "" .Values | quote }}
+          psql:
+            host: {{ $glPsql }}
+            port: 5432
+            username: {{ dig "gitlab" "psqlUsername" "gitlab" .Values | quote }}
+            database: {{ dig "gitlab" "psqlDatabase" "gitlabhq_production" .Values | quote }}
+            password:
+              secret: {{ dig "gitlab" "psqlPasswordSecret" "gitlab-psql" .Values | quote }}
+              key: password
+          redis:
+            host: {{ $glRedis }}
+            port: 6379
+            auth:
+              enabled: true
+              secret: {{ dig "gitlab" "redisPasswordSecret" "gitlab-redis" .Values | quote }}
+              key: redis-password
+          registry:
+            bucket: {{ dig "gitlab" "registryBucket" "gitlab-registry" .Values | quote }}
+          appConfig:
+            object_store:
+              enabled: true
+              connection:
+                secret: {{ dig "gitlab" "objectStorageSecret" "gitlab-object-storage" .Values | quote }}
+                key: connection
+            backups:
+              bucket: {{ dig "gitlab" "backupBucket" "gitlab-backups" .Values | quote }}
+              tmpBucket: {{ dig "gitlab" "backupTmpBucket" "gitlab-backups-tmp" .Values | quote }}
+        gitlab:
+          toolbox:
+            backups:
+              objectStorage:
+                config:
+                  secret: {{ dig "gitlab" "backupConfigSecret" "gitlab-s3cmd" .Values | quote }}
+                  key: config
 
   - name: gitlab-runner
     namespace: {{ .Values.apps.gitlabRunner.namespace }}
@@ -572,11 +681,11 @@ releases:
     createNamespace: true
     {{- if .Values.apps.juicefsCsi.enabled }}
     needs:
-      - redis/redis
+      - {{ .Values.apps.redis.namespace }}/redis
       {{- if .Values.apps.rustfs.enabled }}
-      - rustfs/rustfs
+      - {{ .Values.apps.rustfs.namespace }}/rustfs
       {{- else if .Values.apps.minio.enabled }}
-      - minio/minio
+      - {{ .Values.apps.minio.namespace }}/minio
       {{- end }}
     {{- end }}
     values:
@@ -588,14 +697,14 @@ releases:
             reclaimPolicy: Delete
             backend:
               name: {{ dig "juicefs" "name" "jfs" .Values | quote }}
-              metaurl: {{ printf "redis://:%s@redis-master.redis.svc:6379/1" (dig "redis" "password" "" .Values) | quote }}
+              metaurl: {{ printf "redis://:%s@redis-master.%s.svc:6379/1" (dig "redis" "password" "" .Values) .Values.apps.redis.namespace | quote }}
               storage: minio
               {{- if .Values.apps.rustfs.enabled }}
-              bucket: {{ printf "http://rustfs-svc.rustfs.svc:9000/%s" (dig "juicefs" "name" "jfs" .Values) | quote }}
+              bucket: {{ printf "http://rustfs-svc.%s.svc:9000/%s" .Values.apps.rustfs.namespace (dig "juicefs" "name" "jfs" .Values) | quote }}
               accessKey: {{ dig "rustfs" "accessKey" "" .Values | quote }}
               secretKey: {{ dig "rustfs" "secretKey" "" .Values | quote }}
               {{- else }}
-              bucket: {{ printf "http://minio.minio.svc:9000/%s" (dig "juicefs" "name" "jfs" .Values) | quote }}
+              bucket: {{ printf "http://minio.%s.svc:9000/%s" .Values.apps.minio.namespace (dig "juicefs" "name" "jfs" .Values) | quote }}
               accessKey: {{ dig "minio" "rootUser" "" .Values | quote }}
               secretKey: {{ dig "minio" "rootPassword" "" .Values | quote }}
               {{- end }}
