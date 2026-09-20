@@ -1,18 +1,30 @@
 # Chart 0.147+ requires an explicit image (no implicit default).
 # Official k8s distribution: https://github.com/open-telemetry/opentelemetry-helm-charts
+#
+# Deployment mode, not daemonset: apps reach it by Service DNS
+# (opentelemetry-collector.monitoring.svc:4317) instead of hostPort on each
+# node, so a workload does not depend on the agent of its own node.
 mode: deployment
 image:
-  repository: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s
+  # Nodes here cannot reach Docker Hub directly; use the DaoCloud mirror.
+  repository: docker.m.daocloud.io/otel/opentelemetry-collector-k8s
 command:
   name: otelcol-k8s
 
+# Tags every span with namespace / pod / node / workload. This is the main
+# reason to route through a collector at all — an app cannot fill these in.
+presets:
+  kubernetesAttributes:
+    enabled: true
+
 # The chart ships `debug` as the only exporter, so out of the box every span
-# received here is dropped. Point traces at Tempo, which listens on OTLP 4317
-# by default. Receivers and processors keep the chart defaults.
+# received here is dropped. Tempo listens on OTLP 4317 and lives next to
+# kube-prometheus-stack in `monitoring`. Receivers and processors keep the
+# chart defaults.
 config:
   exporters:
     otlp/tempo:
-      endpoint: tempo.observability.svc:4317
+      endpoint: tempo.monitoring.svc:4317
       tls:
         insecure: true
   service:

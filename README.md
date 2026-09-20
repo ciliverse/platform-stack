@@ -65,7 +65,7 @@ fluxGitops:
 | 可观测 | VictoriaLogs | 日志存储 | 开 |
 | 可观测 | VictoriaLogs Collector | 采集节点上的容器日志 | 开 |
 | 可观测 | VictoriaMetrics | 指标备选，不要与 Prometheus 同时当主刮取 | 关 |
-| 可观测 | OpenTelemetry Collector | OTLP 采集 | 开 |
+| 可观测 | OpenTelemetry Collector | OTLP 采集（deployment 模式，带 `k8sattributes`） | 开 |
 | 可观测 | Tempo | 链路 | 开 |
 | 可观测 | Pyroscope | 持续剖析 | 开 |
 | 可观测 | Loki | 日志备选，与 VictoriaLogs 互斥 | 关 |
@@ -107,7 +107,7 @@ ExternalDNS 默认关。打开后按 Ingress / Service 写 DNS；同时开了 Ga
 
 metrics-server 默认开，给 `kubectl top` 和 HPA 用。kubeadm / Kind 上 chart overlay 带 `--kubelet-insecure-tls`。目标集群已经有 metrics-server 时，把 `metricsServer.enabled` 关掉再 apply。
 
-可观测默认是 **指标（Prometheus）+ 日志（VictoriaLogs）+ 链路（Tempo）+ 剖析（Pyroscope）**。Collector 是 DaemonSet，把容器日志打进 VictoriaLogs（`:9428`）。链路上，应用把 span 发给 `opentelemetry-collector.observability.svc:4317`，OTel Collector 再转给 Tempo —— 转发这一段是本仓在 `values/apps/opentelemetry-collector.yaml` 里显式配的 `otlp/tempo` exporter；chart 默认的 traces pipeline 只有 `debug`，不配就等于收到即丢弃。VictoriaMetrics 默认关，当作 Prometheus 的替换/备选。Loki 默认关，当作 VictoriaLogs 的替换（开 Loki 时 Promtail 会一起装，且必须关掉 VictoriaLogs）。Beyla 默认关，需要集群级 eBPF 剖析时再开。
+可观测默认是 **指标（Prometheus）+ 日志（VictoriaLogs）+ 链路（Tempo）+ 剖析（Pyroscope）**。VictoriaLogs Collector 是 DaemonSet，把容器日志打进 VictoriaLogs（`:9428`）。链路上，OTel Collector 与 Tempo 都装在 `monitoring`（和 kube-prometheus-stack 同一个命名空间，Grafana 里指标跳链路更顺）；OTel Collector 用 **deployment 模式**，应用按 Service DNS 把 span 发给 `opentelemetry-collector.monitoring.svc:4317`（不是 daemonset 的 hostPort，应用因此不依赖本节点的 agent），Collector 再转给 Tempo —— 转发这一段是本仓在 `values/apps/opentelemetry-collector.yaml` 里显式配的 `otlp/tempo` exporter；chart 默认的 traces pipeline 只有 `debug`，不配就等于收到即丢弃。VictoriaMetrics 默认关，当作 Prometheus 的替换/备选。Loki 默认关，当作 VictoriaLogs 的替换（开 Loki 时 Promtail 会一起装，且必须关掉 VictoriaLogs）。Beyla 默认关，需要集群级 eBPF 剖析时再开。
 
 Istio 默认关，只装控制面（istiod），不另开 Istio Ingress；对外入口默认仍是 APISIX，备选 Envoy Gateway。
 

@@ -90,14 +90,16 @@ apps:
     enabled: true
     version: "86.1.1"
     namespace: monitoring
+  # Traces live next to kube-prometheus-stack in `monitoring`: the collector
+  # exports to Tempo by Service DNS, and Grafana links metrics to traces.
   opentelemetryCollector:
     enabled: true
     version: "0.147.1"
-    namespace: observability
+    namespace: monitoring
   tempo:
     enabled: true
     version: "1.24.4"
-    namespace: observability
+    namespace: monitoring
   victoriaLogs:
     enabled: true
     version: "0.13.9"
