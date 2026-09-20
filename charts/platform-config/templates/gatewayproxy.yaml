@@ -1,0 +1,35 @@
+{{- if .Values.apisixGatewayProxy.enabled }}
+{{/*
+APISIX ingress controller 2.x does not program the data plane until a
+GatewayProxy tells it which control plane to write to, and the IngressClass
+points at that GatewayProxy. Without both, Ingress objects are reconciled and
+then silently dropped: the gateway answers "404 Route Not Found" for every host.
+The apisix chart creates the IngressClass without `parameters`, so patch it:
+
+  kubectl patch ingressclass {{ .Values.apisixGatewayProxy.ingressClass }} --type merge -p '{"spec":{"parameters":{
+    "apiGroup":"apisix.apache.org","kind":"GatewayProxy","scope":"Namespace",
+    "namespace":"{{ .Values.apisixGatewayProxy.namespace }}","name":"{{ .Values.apisixGatewayProxy.name }}"}}}'
+*/}}
+apiVersion: apisix.apache.org/v1alpha1
+kind: GatewayProxy
+metadata:
+  name: {{ .Values.apisixGatewayProxy.name }}
+  namespace: {{ .Values.apisixGatewayProxy.namespace }}
+spec:
+  provider:
+    type: ControlPlane
+    controlPlane:
+      endpoints:
+        - {{ .Values.apisixGatewayProxy.adminEndpoint }}
+      auth:
+        type: AdminKey
+        adminKey:
+          {{- if .Values.apisixGatewayProxy.adminKeySecret }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.apisixGatewayProxy.adminKeySecret }}
+              key: {{ .Values.apisixGatewayProxy.adminKeySecretKey }}
+          {{- else }}
+          value: {{ required "set apisixGatewayProxy.adminKey or adminKeySecret" .Values.apisixGatewayProxy.adminKey | quote }}
+          {{- end }}
+{{- end }}

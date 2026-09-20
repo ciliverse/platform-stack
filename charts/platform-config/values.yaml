@@ -1,3 +1,16 @@
+# Wires the APISIX ingress controller (2.x) to its data plane. Off by default:
+# it only applies where the apisix release already runs.
+apisixGatewayProxy:
+  enabled: false
+  name: apisix-proxy-config
+  namespace: apisix
+  ingressClass: apisix
+  adminEndpoint: http://apisix-admin.apisix.svc.cluster.local:9180
+  # Prefer a secret; adminKey is the plain value and lands in the manifest.
+  adminKey: ""
+  adminKeySecret: ""
+  adminKeySecretKey: admin-key
+
 metallb:
   enabled: false
   addresses: ""

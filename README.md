@@ -77,6 +77,8 @@ fluxGitops:
 
 业务入口默认用 Ingress，class 取 `private.yaml` 的 `ingressClass`（默认 `apisix`），证书注解 `cert-manager.io/cluster-issuer: selfsigned`（公网改 `letsencrypt-prod`）。备选是 **Gateway API**：先开 `gatewayApi`（只装 CRD）或直接开 `envoyGateway`（CRD + 控制器）。HTTPRoute 用 GatewayClass `eg`。南北流量选一个当主（APISIX 或 Envoy Gateway），不要两个一起当主入口。Istio 只做 sidecar，不提供对外 Ingress。
 
+**APISIX ingress controller 2.x 还需要一个 `GatewayProxy`**：控制器自己不知道该把路由写给哪个数据面，缺了它 Ingress 会被 reconcile 然后丢掉，网关对所有域名回 `404 Route Not Found`，日志里只有一句 `no GatewayProxy configs provided`。`charts/platform-config` 的 `apisixGatewayProxy`（默认关）负责建这个对象；apisix chart 建出来的 IngressClass 没有 `parameters`，还要按模板注释里的 `kubectl patch` 指到该 GatewayProxy。
+
 **Envoy Gateway 不处理 Ingress 对象**，它只实现 Gateway API。所以关掉 APISIX 时，示例 Ingress 和 Let's Encrypt 的 http01 挑战都会指向一个没人接管的 class；这种组合 helmfile 直接 fail，要么开着 APISIX，要么把 `ingressClass` 改成实际在跑的控制器。
 
 CI 把镜像推到 **GitLab Registry** 或 **Harbor**，不要两个都当主仓库。开 Harbor 时，清单会关掉 GitLab 自带 Registry。Harbor 默认 ClusterIP（`http://harbor.harbor.svc`），需要域名时再改 Ingress。
