@@ -1,4 +1,11 @@
 # Runs GitLab CI jobs in-cluster. Default: disabled.
 # gitlabUrl and runnerToken come from values/private.yaml via helmfile.
+# CoreDNS does not read node /etc/hosts; job pods need these aliases.
 rbac:
   create: true
+hostAliases:
+  - ip: "10.0.0.10"
+    hostnames:
+      - gitlab.example.com
+      - registry.example.com
+

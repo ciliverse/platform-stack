@@ -101,7 +101,7 @@ CI 把镜像推到 **GitLab Registry** 或 **Harbor**，不要两个都当主仓
 
 GitLab 自带的 cert-manager 与 issuer 在 `values/apps/gitlab.yaml` 里关掉了：本仓单独装 cert-manager，ClusterIssuer 由 `charts/platform-config` 提供，两边都开会变成两个证书来源。
 
-GitLab CI 要在集群里跑 job，还要单独开 `gitlabRunner`（只开 GitLab 不会装 Runner）。在 `private.yaml` 填 `gitlabUrl`（带 `https://`）和 `runnerToken`。token 从 GitLab 里已注册的 runner 拿，不是旧的 registration token。
+GitLab CI 要在集群里跑 job，还要单独开 `gitlabRunner`（只开 GitLab 不会装 Runner）。在 `private.yaml` 填 `gitlabUrl`（带 `https://`）和 `runnerToken`。token 从 GitLab 里已注册的 runner 拿，不是旧的 registration token。CoreDNS 不读节点 `/etc/hosts`；GitLab 主机名在集群里解析不了时，把主机名写进 `values/apps/gitlab-runner.yaml` 的 `hostAliases`。
 
 ExternalDNS 默认关。打开后按 Ingress / Service 写 DNS；同时开了 Gateway API 或 Envoy Gateway 时会多 watch `HTTPRoute`。策略是 `upsert-only`（不删你在 DNS 控制台手工建的记录）。必须在 `private.yaml` 写 `provider`（不要用 chart 默认的 `aws`）；Cloudflare 还要 `cloudflareApiToken`。
 
