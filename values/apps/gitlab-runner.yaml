@@ -2,6 +2,7 @@
 # gitlabUrl and runnerToken come from values/private.yaml via helmfile.
 # CoreDNS does not read node /etc/hosts; job pods need these aliases.
 # Chart 0.89 ignores runners.privileged; DinD needs privileged in runners.config.
+# Top-level hostAliases only reach the runner pod, so job pods repeat them below.
 rbac:
   create: true
 hostAliases:
@@ -16,4 +17,7 @@ runners:
         namespace = "{{ default .Release.Namespace .Values.runners.jobNamespace }}"
         image = "alpine"
         privileged = true
+        [[runners.kubernetes.host_aliases]]
+          ip = "10.0.0.10"
+          hostnames = ["gitlab.example.com", "registry.example.com"]
 
