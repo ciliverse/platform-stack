@@ -1,6 +1,7 @@
 # Runs GitLab CI jobs in-cluster. Default: disabled.
 # gitlabUrl and runnerToken come from values/private.yaml via helmfile.
 # CoreDNS does not read node /etc/hosts; job pods need these aliases.
+# Chart 0.89 ignores runners.privileged; DinD needs privileged in runners.config.
 rbac:
   create: true
 hostAliases:
@@ -8,4 +9,11 @@ hostAliases:
     hostnames:
       - gitlab.example.com
       - registry.example.com
+runners:
+  config: |
+    [[runners]]
+      [runners.kubernetes]
+        namespace = "{{ default .Release.Namespace .Values.runners.jobNamespace }}"
+        image = "alpine"
+        privileged = true
 
