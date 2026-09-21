@@ -204,3 +204,14 @@ apps:
 # 改 version 后再
 ./scripts/apply.sh
 ```
+
+两条 pin 是刻意不跟最新的，`bump.sh` 提示能升时先看这里：
+
+- **headlamp 停在 0.39.0**。0.40.x 的 chart 会给应用传 `-session-ttl`，而 v0.40.1 的二进制不认这个 flag，容器在解析参数时就退出。镜像仍用 v0.40.1，见 [`values/apps/headlamp.yaml`](values/apps/headlamp.yaml)
+- **metrics-server 停在 3.13.0**。3.14.0 对应 app v0.9.0，部分镜像站还没同步，节点会 `ImagePullBackOff`
+
+## 命名约定
+
+发布名就是应用名，命名空间同名，一个应用一个命名空间。两处例外都有原因：`metrics-server` 属于集群插件，跟上游一样放 `kube-system`；`jenkins` 在 `cicd`，因为 JENKINS_HOME 是 PVC，换命名空间等于迁数据。
+
+这条约定不只是整洁问题——**Helmfile 靠「发布名 + 命名空间」认领 release**。名字对不上，它既不会升级你已有的那个，也不会因为开关关着而卸掉它，而是在旁边再装一份；名字对得上而开关是关的，`apply` 就会把正在跑的卸掉。所以往已有集群接这份清单前，先用 `helm list -A` 把两边的名字和命名空间对一遍。

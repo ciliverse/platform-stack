@@ -515,7 +515,10 @@ releases:
             value: {{ dig "externalDns" "cloudflareApiToken" "" .Values | quote }}
         {{- end }}
 
-  - name: argo-cd
+  # Release name is `argocd`, not the chart name: it matches the namespace and
+  # the argocd CLI, and renaming an installed release means uninstalling it —
+  # which takes the CRDs and every Application object with it.
+  - name: argocd
     namespace: {{ .Values.apps.argoCd.namespace }}
     chart: argo/argo-cd
     version: {{ .Values.apps.argoCd.version | quote }}

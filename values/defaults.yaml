@@ -27,7 +27,8 @@ apps:
   jenkins:
     enabled: false
     version: "5.9.9"
-    namespace: jenkins
+    # JENKINS_HOME is a PVC; moving namespaces means migrating the volume.
+    namespace: cicd
   argoCd:
     enabled: false
     version: "9.4.17"
@@ -56,7 +57,11 @@ apps:
     namespace: metallb-system
   metricsServer:
     enabled: true
-    version: "3.14.0"
+    # 3.14.0 ships app v0.9.0, which registry mirrors may not carry yet; 3.13.0
+    # (v0.8.0) pulls everywhere. Bump once the mirror has it.
+    version: "3.13.0"
+    # Cluster addon, not an observability component: it backs HPA and
+    # `kubectl top`, and its APIService is cluster-wide and single-owner.
     namespace: kube-system
   certManager:
     enabled: true
@@ -84,7 +89,10 @@ apps:
     namespace: cilikube
   headlamp:
     enabled: true
-    version: "0.40.1"
+    # Not 0.40.x: those charts pass `-session-ttl` to the app, and the matching
+    # v0.40.1 binary rejects the flag and crash-loops. 0.39.0 runs the newer
+    # image fine — see values/apps/headlamp.yaml.
+    version: "0.39.0"
     namespace: headlamp
   kubePrometheusStack:
     enabled: true
