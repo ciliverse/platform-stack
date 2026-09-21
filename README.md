@@ -205,10 +205,7 @@ apps:
 ./scripts/apply.sh
 ```
 
-两条 pin 是刻意不跟最新的，`bump.sh` 提示能升时先看这里：
-
-- **headlamp 停在 0.39.0**。0.40.x 的 chart 会给应用传 `-session-ttl`，而 v0.40.1 的二进制不认这个 flag，容器在解析参数时就退出。镜像仍用 v0.40.1，见 [`values/apps/headlamp.yaml`](values/apps/headlamp.yaml)
-- **metrics-server 停在 3.13.0**。3.14.0 对应 app v0.9.0，部分镜像站还没同步，节点会 `ImagePullBackOff`
+`bump.sh` 提示 headlamp 可以升到 0.40.x 时**跳过这一档**：那几个 chart 会给应用传 `-session-ttl`，而对应的 v0.40.1 二进制不认这个 flag，容器在解析参数时就退出。0.45.0 的二进制认，所以 pin 在 0.45.0。
 
 ## 命名约定
 

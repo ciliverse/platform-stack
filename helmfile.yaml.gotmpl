@@ -350,8 +350,6 @@ releases:
     version: {{ .Values.apps.headlamp.version | quote }}
     installed: {{ .Values.apps.headlamp.enabled }}
     createNamespace: true
-    values:
-      - values/apps/headlamp.yaml
 
   # Chart index on charts.cillian.website is still 1.0.0; image tags in values/apps/cilikube.yaml track app v1.5.0.
   - name: cilikube

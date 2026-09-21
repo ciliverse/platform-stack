@@ -1,8 +1,0 @@
-# Differences from upstream defaults only.
-#
-# Chart 0.39.0 defaults to app v0.39.0; run the newer binary instead. The 0.40.x
-# charts would be the obvious way to get it, but they pass `-session-ttl`, which
-# v0.40.1 does not accept — the container exits on flag parsing. Older chart plus
-# newer image is the combination that runs.
-image:
-  tag: v0.40.1
