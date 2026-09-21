@@ -1,5 +1,6 @@
 # Loki as a VictoriaLogs alternative. Default: disabled.
 # SingleBinary + filesystem; do not enable together with victoriaLogs.
+# PVCs omit storageClassName so they land on the cluster default StorageClass.
 deploymentMode: SingleBinary
 loki:
   auth_enabled: false
@@ -20,7 +21,6 @@ singleBinary:
   replicas: 1
   persistence:
     enabled: true
-    storageClass: local-path
     size: 10Gi
 backend:
   replicas: 0

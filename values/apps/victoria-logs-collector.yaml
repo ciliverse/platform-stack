@@ -1,2 +1,13 @@
 # Ships Kubernetes container logs into VictoriaLogs. Destination URL is
 # filled by helmfile from the victoria-logs-single Service.
+
+# Without this the DaemonSet skips tainted control-plane nodes, and apiserver /
+# etcd / scheduler logs never reach the store — the ones you want during an
+# outage.
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+  - key: node-role.kubernetes.io/master
+    operator: Exists
+    effect: NoSchedule

@@ -431,6 +431,8 @@ releases:
           enabled: {{ .Values.letsencrypt.enabled | default false }}
           email: {{ dig "letsencrypt" "email" "" .Values | quote }}
           ingressClass: {{ $ingressClass | quote }}
+        localCa:
+          enabled: {{ dig "localCa" "enabled" false .Values }}
         exampleIngress:
           enabled: {{ .Values.exampleIngress.enabled | default false }}
           clusterIssuer: {{ if .Values.letsencrypt.enabled }}letsencrypt-prod{{ else }}selfsigned{{ end }}

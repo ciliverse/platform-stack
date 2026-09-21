@@ -1,9 +1,8 @@
 # Standalone: official chart defaults to 4-node distributed.
+# PVCs omit storageClassName so they land on the cluster default StorageClass.
 mode:
   standalone:
     enabled: true
   distributed:
     enabled: false
-storageclass:
-  name: local-path
 # access_key / secret_key come from values/private.yaml via helmfile inline values.

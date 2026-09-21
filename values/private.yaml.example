@@ -25,6 +25,14 @@ ingressClass: apisix
 letsencrypt:
   email: ""
 
+# Turn this on instead of letsencrypt when the hosts resolve to addresses ACME
+# cannot reach (LAN, split-horizon DNS). It signs a root the cluster owns and
+# adds a `local-ca` ClusterIssuer; import the root into clients once:
+#   kubectl get secret local-ca-tls -n cert-manager \
+#     -o jsonpath='{.data.ca\.crt}' | base64 -d > local-ca.crt
+localCa:
+  enabled: false
+
 fluxGitops:
   gitUrl: ""
   branch: main

@@ -26,6 +26,19 @@ letsencrypt:
   server: https://acme-v02.api.letsencrypt.org/directory
   ingressClass: apisix
 
+# Self-signed root + a `ca` ClusterIssuer that signs from it. For names ACME
+# cannot validate (private IPs, internal-only DNS). Requires certManager.
+localCa:
+  enabled: false
+  name: local-ca
+  issuerName: local-ca
+  # cert-manager's cluster resource namespace.
+  namespace: cert-manager
+  secretName: local-ca-tls
+  commonName: local-ca
+  duration: 87600h
+  renewBefore: 720h
+
 exampleIngress:
   enabled: false
   clusterIssuer: selfsigned

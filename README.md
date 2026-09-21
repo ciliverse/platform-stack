@@ -42,15 +42,15 @@ fluxGitops:
 | --- | --- | --- | --- |
 | 代码 | GitLab | 代码仓、MR | 关 |
 | CI | GitLab CI | 随 GitLab，构建并推镜像 | 随 GitLab |
-| CI | GitLab Runner | 在集群里跑 GitLab CI job；需 `gitlabUrl` + `runnerToken` | 关 |
-| CI | Jenkins | 独立 CI，与 GitLab CI 二选一即可 | 关 |
+| CI | GitLab Runner | 在集群里跑 GitLab CI job；需 `gitlabUrl` + `runnerToken` | 开 |
+| CI | Jenkins | 独立 CI，与 GitLab CI 二选一即可 | 开 |
 | 镜像仓库 | GitLab Registry | 随 GitLab，CI 推镜像 | 随 GitLab |
 | 镜像仓库 | Harbor | 独立仓库；与 GitLab Registry 二选一 | 关 |
-| CD | Argo CD | 把应用同步到集群 | 关 |
-| CD | Flux | 同上；不要与 Argo CD 同时当主控 | 关 |
+| CD | Argo CD | 把应用同步到集群 | 开 |
+| CD | Flux | 同上；不要与 Argo CD 同时当主控 | 开 |
 | 流量入口 | MetalLB | 裸金属 L2 VIP，给网关 LoadBalancer | 开 |
-| 流量入口 | cert-manager | 发证书；默认 ClusterIssuer `selfsigned` | 开 |
-| 流量入口 | APISIX | HTTP 网关与 Ingress Controller | 开 |
+| 流量入口 | cert-manager | 发证书；ClusterIssuer `selfsigned`，可选 `local-ca`、`letsencrypt-prod` | 开 |
+| 流量入口 | APISIX | HTTP/HTTPS 网关与 Ingress Controller | 开 |
 | 流量入口 | Gateway API | Kubernetes Gateway / HTTPRoute CRD | 关 |
 | 流量入口 | Envoy Gateway | Gateway API 的一种实现（GatewayClass `eg`） | 关 |
 | 流量入口 | ExternalDNS | 把 Ingress / Service（开 Gateway API 时含 HTTPRoute）写成 DNS | 关 |
@@ -75,7 +75,16 @@ fluxGitops:
 | 集群管理 | CiliKube | 看节点和工作负载 | 开 |
 | 集群管理 | Headlamp | 看节点和工作负载 | 开 |
 
-业务入口默认用 Ingress，class 取 `private.yaml` 的 `ingressClass`（默认 `apisix`），证书注解 `cert-manager.io/cluster-issuer: selfsigned`（公网改 `letsencrypt-prod`）。备选是 **Gateway API**：先开 `gatewayApi`（只装 CRD）或直接开 `envoyGateway`（CRD + 控制器）。HTTPRoute 用 GatewayClass `eg`。南北流量选一个当主（APISIX 或 Envoy Gateway），不要两个一起当主入口。Istio 只做 sidecar，不提供对外 Ingress。
+业务入口默认用 Ingress，class 取 `private.yaml` 的 `ingressClass`（默认 `apisix`），证书注解 `cert-manager.io/cluster-issuer: selfsigned`（公网改 `letsencrypt-prod`）。
+
+**域名解析到内网地址时，ACME 签不出证书**：Let's Encrypt 要从公网访问 `http://<域名>/.well-known/...` 做 http01 校验，指向 `192.168.x.x` 的记录它连不上；dns01 则要求 DNS 托管商有对应的 cert-manager webhook。这种情况打开 `localCa.enabled`：`platform-config` 会用 `selfsigned` 签一张自签根证书，再建一个从它签发的 `local-ca` ClusterIssuer。Ingress 注解写 `cert-manager.io/cluster-issuer: local-ca`，客户端**导入一次根证书**，之后这个 issuer 签的所有域名都受信任。导出根证书：
+
+```bash
+kubectl get secret local-ca-tls -n cert-manager \
+  -o jsonpath='{.data.ca\.crt}' | base64 -d > local-ca.crt
+```
+
+**网关要自己打开 HTTPS 监听**：apisix chart 的 `apisix.ssl.enabled` 默认是 `false`，此时 Ingress 里的 `tls:` 块会被正常接受、证书也会签出来，但 443 根本没人监听。本仓 `values/apps/apisix.yaml` 已经打开它并把 Service 的 `tls.servicePort` 设成 443。备选是 **Gateway API**：先开 `gatewayApi`（只装 CRD）或直接开 `envoyGateway`（CRD + 控制器）。HTTPRoute 用 GatewayClass `eg`。南北流量选一个当主（APISIX 或 Envoy Gateway），不要两个一起当主入口。Istio 只做 sidecar，不提供对外 Ingress。
 
 **APISIX ingress controller 2.x 还需要一个 `GatewayProxy`**：控制器自己不知道该把路由写给哪个数据面，缺了它 Ingress 会被 reconcile 然后丢掉，网关对所有域名回 `404 Route Not Found`，日志里只有一句 `no GatewayProxy configs provided`。`charts/platform-config` 的 `apisixGatewayProxy`（默认关）负责建这个对象；apisix chart 建出来的 IngressClass 没有 `parameters`，还要按模板注释里的 `kubectl patch` 指到该 GatewayProxy。
 
@@ -113,7 +122,9 @@ metrics-server 默认开，给 `kubectl top` 和 HPA 用。kubeadm / Kind 上 ch
 
 Istio 默认关，只装控制面（istiod），不另开 Istio Ingress；对外入口默认仍是 APISIX，备选 Envoy Gateway。
 
-RustFS 与 MinIO 不要同时开启，helmfile 会失败。JuiceFS 的 StorageClass 名是 `juicefs`；Prometheus、Tempo、对象存储自己的盘继续用 `local-path`。集群里已有 default StorageClass 时，关掉 `localPathProvisioner`。
+RustFS 与 MinIO 不要同时开启，helmfile 会失败。JuiceFS 的 StorageClass 名是 `juicefs`；其余组件的 PVC **都不写 `storageClassName`**，落在集群的 default StorageClass 上。集群里已经有 default StorageClass 时（比如 OpenEBS 的 `openebs-hostpath`），在 `private.yaml` 里关掉 `localPathProvisioner`，否则会多出第二套 hostpath provisioner。
+
+Prometheus 与 Tempo 本仓**没有配 persistence**，用的是 chart 默认的 emptyDir：Pod 一重建历史数据就没了。要留存得自己加 `persistence`。
 
 CiliKube 公开 index 上的 chart 版本是 **1.0.0**，镜像 tag 在 `values/apps/cilikube.yaml` 为 **v1.5.0**。
 
@@ -206,6 +217,8 @@ apps:
 ```
 
 `bump.sh` 提示 headlamp 可以升到 0.40.x 时**跳过这一档**：那几个 chart 会给应用传 `-session-ttl`，而对应的 v0.40.1 二进制不认这个 flag，容器在解析参数时就退出。0.45.0 的二进制认，所以 pin 在 0.45.0。
+
+kube-prometheus-stack 跨大版本升级时，**Helm 不会更新 CRD**，新 operator 会拿旧 schema 去 reconcile。chart 自带的 `crds.upgradeJob` 用 pre-upgrade hook 补这一刀，本仓已经打开（还带 `forceConflicts`，因为集群里的 CRD 归最早创建它的 field manager 所有）。
 
 ## 命名约定
 

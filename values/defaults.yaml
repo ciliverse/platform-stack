@@ -15,6 +15,9 @@ fluxGitops:
 
 letsencrypt:
   enabled: false
+# Self-signed root CA + `local-ca` ClusterIssuer, for hosts ACME cannot reach.
+localCa:
+  enabled: false
 exampleIngress:
   enabled: false
 
@@ -25,16 +28,16 @@ apps:
     version: "10.0.1"
     namespace: gitlab
   jenkins:
-    enabled: false
+    enabled: true
     version: "5.9.9"
     # JENKINS_HOME is a PVC; moving namespaces means migrating the volume.
     namespace: cicd
   argoCd:
-    enabled: false
+    enabled: true
     version: "9.4.17"
     namespace: argocd
   flux2:
-    enabled: false
+    enabled: true
     version: "2.18.4"
     namespace: flux-system
   harbor:
@@ -42,8 +45,10 @@ apps:
     version: "1.19.2"
     namespace: harbor
   gitlabRunner:
-    enabled: false
-    version: "0.92.1"
+    enabled: true
+    # Pinned to what the cluster runs: values/apps/gitlab-runner.yaml carries a
+    # runners.config block, and 0.9x reshuffled those keys more than once.
+    version: "0.89.0"
     namespace: gitlab-runner
 
   # --- 流量入口 / 存储 / 集群管理 / 可观测 ---

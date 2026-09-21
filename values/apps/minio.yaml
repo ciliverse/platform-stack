@@ -1,6 +1,6 @@
 # Optional S3. Mutually exclusive with rustfs (helmfile fail if both enabled).
+# PVCs omit storageClassName so they land on the cluster default StorageClass.
 mode: standalone
 replicas: 1
 persistence:
   enabled: true
-  storageClass: local-path

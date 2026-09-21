@@ -1,2 +1,11 @@
 # Differences from upstream defaults only.
 # Kind / demo slimming: helmfile -e kind (see values/kind/).
+
+# Helm never upgrades CRDs it installed with a chart, so a major bump otherwise
+# leaves the new operator reconciling against the old schema. This job applies
+# them from a pre-upgrade hook. forceConflicts because the CRDs already in the
+# cluster are owned by whichever field manager first created them.
+crds:
+  upgradeJob:
+    enabled: true
+    forceConflicts: true

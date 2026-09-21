@@ -22,4 +22,40 @@ spec:
           ingress:
             class: {{ .Values.letsencrypt.ingressClass | quote }}
 {{- end }}
+{{- if .Values.localCa.enabled }}
+---
+# A root the cluster signs itself, for hosts ACME cannot reach: private
+# addresses, split-horizon names, anything not resolvable from the internet.
+# Import this one certificate into a browser or OS trust store and every
+# certificate the `{{ .Values.localCa.issuerName }}` issuer signs is trusted.
+#
+# The Certificate must live in cert-manager's cluster resource namespace,
+# otherwise the ClusterIssuer cannot read its Secret.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .Values.localCa.name }}
+  namespace: {{ .Values.localCa.namespace }}
+spec:
+  isCA: true
+  commonName: {{ .Values.localCa.commonName | quote }}
+  secretName: {{ .Values.localCa.secretName }}
+  duration: {{ .Values.localCa.duration | quote }}
+  renewBefore: {{ .Values.localCa.renewBefore | quote }}
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: selfsigned
+    kind: ClusterIssuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ .Values.localCa.issuerName }}
+spec:
+  ca:
+    secretName: {{ .Values.localCa.secretName }}
+{{- end }}
 {{- end }}
