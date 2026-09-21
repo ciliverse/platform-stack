@@ -176,6 +176,11 @@ kubectl -n apisix get svc apisix-gateway
 
 把 CiliKube / Grafana 挂到网关：`exampleIngress.enabled: true`，并在 `private.yaml` 写入 `hosts.cilikube` / `hosts.grafana`。
 
+Argo CD 和 Jenkins 的入口同样由 `private.yaml` 的 `hosts.argocd` / `hosts.jenkins` 决定：**填了就渲染 Ingress，留空就只有 ClusterIP**，需要时 port-forward。证书注解自动取当前可用的 issuer（`letsencrypt.enabled` → `letsencrypt-prod`，否则 `localCa.enabled` → `local-ca`，再否则 `selfsigned`）。这两个 chart 各有一处必须配合网关：
+
+- Argo CD 开了 `configs.params.server.insecure`。网关终结 TLS 后转发的是明文 HTTP，不关这个开关，`argocd-server` 会把它重定向回 HTTPS，浏览器一直转圈。
+- Jenkins 的 `controller.jenkinsUrl` 指向对外域名，否则它生成的绝对链接会用集群内的 Service 名。chart 默认不渲染 Ingress 的 `path`，这里显式写了 `/` 与 `Prefix`。
+
 没有域名时可以 port-forward：
 
 ```bash
@@ -225,3 +230,15 @@ kube-prometheus-stack 跨大版本升级时，**Helm 不会更新 CRD**，新 op
 发布名就是应用名，命名空间同名，一个应用一个命名空间。两处例外都有原因：`metrics-server` 属于集群插件，跟上游一样放 `kube-system`；`jenkins` 在 `cicd`，因为 JENKINS_HOME 是 PVC，换命名空间等于迁数据。
 
 这条约定不只是整洁问题——**Helmfile 靠「发布名 + 命名空间」认领 release**。名字对不上，它既不会升级你已有的那个，也不会因为开关关着而卸掉它，而是在旁边再装一份；名字对得上而开关是关的，`apply` 就会把正在跑的卸掉。所以往已有集群接这份清单前，先用 `helm list -A` 把两边的名字和命名空间对一遍。
+
+## 看 diff 时的一个坑
+
+`helmfile diff` 跑的是 dry-run，而 **dry-run 里的 `lookup` 一律返回空**。不少 chart 用 `lookup` 保住自己生成的密码和证书——读得到就复用，读不到才随机生成：
+
+```
+{{- $secret := (lookup "v1" "Secret" ... ) }}
+{{- if $secret }}{{ index $secret "data" "admin-password" }}
+{{- else }}{{ (randAlphaNum 40) | b64enc | quote }}{{ end }}
+```
+
+于是每次 diff 都会渲染出一个新随机值，连带引用它的 Deployment / StatefulSet 上的 `checksum/*` 注解一起变，看着像要改，真 `apply` 时其实原封不动。本仓里 Grafana 的 admin 密码、Jenkins 的 admin 密码、APISIX 内置 etcd 的 jwt-token 都是这个情况。**判断方法：看到「Secret 内容变了 + 对应 workload 的 checksum 注解变了」这对组合，先去 chart 里搜一下 `lookup`，别当成漂移去追。**

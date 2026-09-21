@@ -1,1 +1,9 @@
 # Differences from upstream defaults only. Default: disabled.
+# The Ingress host comes from hosts.jenkins in private.yaml, via helmfile.
+
+controller:
+  image:
+    # The chart default is Always, which makes every restart depend on the
+    # registry being reachable. The tag is pinned, so the cached image is the
+    # same image.
+    pullPolicy: IfNotPresent

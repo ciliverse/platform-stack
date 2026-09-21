@@ -143,6 +143,17 @@ controller actually serves. Envoy Gateway implements Gateway API only and
 ignores Ingress objects, so picking it as the entry means setting ingressClass.
 */}}
 {{- $ingressClass := dig "ingressClass" "apisix" .Values }}
+{{/*
+Which issuer the Ingresses ask for. ACME when it can actually validate, the
+cluster's own root when the hosts only resolve on the LAN, otherwise the
+per-certificate selfSigned issuer that is always there.
+*/}}
+{{- $clusterIssuer := "selfsigned" }}
+{{- if .Values.letsencrypt.enabled | default false }}
+{{- $clusterIssuer = "letsencrypt-prod" }}
+{{- else if dig "localCa" "enabled" false .Values }}
+{{- $clusterIssuer = "local-ca" }}
+{{- end }}
 {{- if and (or .Values.exampleIngress.enabled (.Values.letsencrypt.enabled | default false)) (eq $ingressClass "apisix") (not .Values.apps.apisix.enabled) }}
 {{- fail "ingressClass is apisix but apps.apisix is disabled; enable APISIX or set ingressClass in values/private.yaml to a class a running controller serves" }}
 {{- end }}
@@ -435,7 +446,7 @@ releases:
           enabled: {{ dig "localCa" "enabled" false .Values }}
         exampleIngress:
           enabled: {{ .Values.exampleIngress.enabled | default false }}
-          clusterIssuer: {{ if .Values.letsencrypt.enabled }}letsencrypt-prod{{ else }}selfsigned{{ end }}
+          clusterIssuer: {{ $clusterIssuer | quote }}
           ingressClass: {{ $ingressClass | quote }}
           cilikube:
             namespace: {{ .Values.apps.cilikube.namespace }}
@@ -526,6 +537,19 @@ releases:
     createNamespace: true
     values:
       - values/apps/argo-cd.yaml
+      {{- with dig "hosts" "argocd" "" .Values }}
+      - global:
+          domain: {{ . | quote }}
+        server:
+          ingress:
+            enabled: true
+            ingressClassName: {{ $ingressClass | quote }}
+            hostname: {{ . | quote }}
+            annotations:
+              cert-manager.io/cluster-issuer: {{ $clusterIssuer | quote }}
+            # Chart wires this to the argocd-server-tls secret.
+            tls: true
+      {{- end }}
 
   - name: flux2
     namespace: {{ .Values.apps.flux2.namespace }}
@@ -621,6 +645,28 @@ releases:
     createNamespace: true
     values:
       - values/apps/jenkins.yaml
+      {{- with dig "hosts" "jenkins" "" .Values }}
+      - controller:
+          # Jenkins builds absolute URLs from this; leaving it unset makes
+          # links point at the in-cluster Service name.
+          jenkinsUrl: {{ printf "https://%s" . | quote }}
+          ingress:
+            enabled: true
+            # Chart still defaults to extensions/v1beta1.
+            apiVersion: networking.k8s.io/v1
+            ingressClassName: {{ $ingressClass | quote }}
+            hostName: {{ . | quote }}
+            # The chart leaves both empty, which renders a rule with no path at
+            # all; not every controller treats that as "everything".
+            path: /
+            pathType: Prefix
+            annotations:
+              cert-manager.io/cluster-issuer: {{ $clusterIssuer | quote }}
+            tls:
+              - secretName: jenkins-tls
+                hosts:
+                  - {{ . | quote }}
+      {{- end }}
 
   - name: harbor
     namespace: {{ .Values.apps.harbor.namespace }}

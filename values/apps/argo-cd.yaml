@@ -1,1 +1,9 @@
 # Differences from upstream defaults only. Default: disabled.
+# The Ingress host comes from hosts.argocd in private.yaml, via helmfile.
+
+configs:
+  params:
+    # The gateway terminates TLS and forwards plain HTTP. Without this,
+    # argocd-server answers that request with a redirect back to HTTPS and the
+    # browser loops.
+    server.insecure: true
