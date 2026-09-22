@@ -684,6 +684,31 @@ releases:
       - values/apps/gitlab-runner.yaml
       - gitlabUrl: {{ dig "gitlabRunner" "gitlabUrl" "" .Values | quote }}
         runnerToken: {{ dig "gitlabRunner" "runnerToken" "" .Values | quote }}
+      {{- with dig "gitlabRunner" "hostAliases" list .Values }}
+      # CoreDNS does not read node /etc/hosts. The top-level list reaches the
+      # runner pod; job pods are separate and need the same entries repeated
+      # inside runners.config, or DinD cannot resolve the registry.
+      - hostAliases:
+          {{- range . }}
+          - ip: {{ .ip | quote }}
+            hostnames:
+              {{- range .hostnames }}
+              - {{ . | quote }}
+              {{- end }}
+          {{- end }}
+        runners:
+          config: |
+            [[runners]]
+              [runners.kubernetes]
+                namespace = "{{ `{{ default .Release.Namespace .Values.runners.jobNamespace }}` }}"
+                image = "alpine"
+                privileged = true
+                {{- range . }}
+                [[runners.kubernetes.host_aliases]]
+                  ip = {{ .ip | quote }}
+                  hostnames = [{{ range $i, $h := .hostnames }}{{ if $i }}, {{ end }}{{ $h | quote }}{{ end }}]
+                {{- end }}
+      {{- end }}
 
   - name: jenkins
     namespace: {{ .Values.apps.jenkins.namespace }}

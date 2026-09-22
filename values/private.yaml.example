@@ -74,6 +74,13 @@ harbor:
 gitlabRunner:
   gitlabUrl: ""
   runnerToken: ""
+  # Only when the GitLab host has no DNS record the cluster can resolve.
+  # Both the runner pod and the job pods get these entries.
+  hostAliases: []
+  #  - ip: "10.0.0.10"
+  #    hostnames:
+  #      - gitlab.example.com
+  #      - registry.gitlab.example.com
 
 # Only when apps.gitlab is on. Chart 10.x bundles no database, cache or object
 # storage: psqlHost / redisHost default to this repo's own postgresql / redis
