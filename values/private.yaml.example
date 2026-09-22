@@ -53,6 +53,11 @@ hosts:
   # Set these to render an Ingress for the release; empty means no Ingress.
   argocd: ""
   jenkins: ""
+  grafana: ""
+  # These two ship no authentication. Setting a host exposes every metric to
+  # anyone who can reach it, and the Alertmanager UI can silence alerts.
+  prometheus: ""
+  alertmanager: ""
 
 redis:
   password: ""

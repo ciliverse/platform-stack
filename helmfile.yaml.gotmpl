@@ -176,9 +176,6 @@ run after the releases that create them.
 {{- if and .Values.exampleIngress.enabled .Values.apps.cilikube.enabled (dig "hosts" "cilikube" "" .Values) }}
 {{- $pcNeeds = append $pcNeeds (printf "%s/cilikube" .Values.apps.cilikube.namespace) }}
 {{- end }}
-{{- if and .Values.exampleIngress.enabled .Values.apps.kubePrometheusStack.enabled (dig "hosts" "grafana" "" .Values) }}
-{{- $pcNeeds = append $pcNeeds (printf "%s/kube-prometheus-stack" .Values.apps.kubePrometheusStack.namespace) }}
-{{- end }}
 
 repositories:
   - name: prometheus-community
@@ -235,6 +232,67 @@ releases:
     createNamespace: true
     values:
       - values/apps/kube-prometheus-stack.yaml
+      {{- with dig "secrets" "grafanaAdminPassword" "" .Values }}
+      # The chart generates a fresh random password on every render, so leaving
+      # this empty rotates the admin login on each upgrade.
+      - grafana:
+          adminPassword: {{ . | quote }}
+      {{- end }}
+      {{- with dig "hosts" "grafana" "" .Values }}
+      - grafana:
+          ingress:
+            enabled: true
+            ingressClassName: {{ $ingressClass | quote }}
+            hosts: [{{ . | quote }}]
+            annotations:
+              cert-manager.io/cluster-issuer: {{ $clusterIssuer | quote }}
+            tls:
+              - secretName: grafana-tls
+                hosts: [{{ . | quote }}]
+          grafana.ini:
+            server:
+              # Grafana builds redirects and share links from this. The gateway
+              # terminates TLS, so it cannot infer the scheme on its own.
+              domain: {{ . | quote }}
+              root_url: {{ printf "https://%s" . | quote }}
+      {{- end }}
+      {{- with dig "hosts" "prometheus" "" .Values }}
+      # No authentication in front of this UI: anyone who reaches the host can
+      # read every metric the cluster collects.
+      - prometheus:
+          prometheusSpec:
+            # The chart derives this from the ingress host as plain http; the
+            # gateway serves https, and these links get handed to users.
+            externalUrl: {{ printf "https://%s" . | quote }}
+          ingress:
+            enabled: true
+            ingressClassName: {{ $ingressClass | quote }}
+            hosts: [{{ . | quote }}]
+            paths: ["/"]
+            pathType: Prefix
+            annotations:
+              cert-manager.io/cluster-issuer: {{ $clusterIssuer | quote }}
+            tls:
+              - secretName: prometheus-tls
+                hosts: [{{ . | quote }}]
+      {{- end }}
+      {{- with dig "hosts" "alertmanager" "" .Values }}
+      # Same caveat as Prometheus, and worse: this UI can silence alerts.
+      - alertmanager:
+          alertmanagerSpec:
+            externalUrl: {{ printf "https://%s" . | quote }}
+          ingress:
+            enabled: true
+            ingressClassName: {{ $ingressClass | quote }}
+            hosts: [{{ . | quote }}]
+            paths: ["/"]
+            pathType: Prefix
+            annotations:
+              cert-manager.io/cluster-issuer: {{ $clusterIssuer | quote }}
+            tls:
+              - secretName: alertmanager-tls
+                hosts: [{{ . | quote }}]
+      {{- end }}
       {{- if $larkAlerts }}
       # The chart default routes everything to a receiver named 'null', so
       # alerts fire into nothing until a real one is named here.

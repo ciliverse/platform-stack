@@ -52,14 +52,6 @@ exampleIngress:
     serviceName: cilikube-frontend
     servicePort: 80
     tlsSecretName: cilikube-tls
-  grafana:
-    enabled: true
-    namespace: monitoring
-    host: ""
-    serviceName: kube-prometheus-stack-grafana
-    servicePort: 80
-    tlsSecretName: grafana-tls
-
 # Turns Alertmanager webhooks into Lark bot cards. Alertmanager cannot template
 # its webhook body, and a Lark bot only accepts its own message shape, so the
 # two need something in between.

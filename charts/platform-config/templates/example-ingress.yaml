@@ -26,31 +26,4 @@ spec:
                 port:
                   number: {{ .Values.exampleIngress.cilikube.servicePort }}
 {{- end }}
-{{- if and .Values.exampleIngress.grafana.enabled .Values.exampleIngress.grafana.host }}
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: grafana
-  namespace: {{ .Values.exampleIngress.grafana.namespace }}
-  annotations:
-    cert-manager.io/cluster-issuer: {{ $issuer | quote }}
-spec:
-  ingressClassName: {{ .Values.exampleIngress.ingressClass }}
-  tls:
-    - hosts:
-        - {{ .Values.exampleIngress.grafana.host | quote }}
-      secretName: {{ .Values.exampleIngress.grafana.tlsSecretName }}
-  rules:
-    - host: {{ .Values.exampleIngress.grafana.host | quote }}
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ .Values.exampleIngress.grafana.serviceName }}
-                port:
-                  number: {{ .Values.exampleIngress.grafana.servicePort }}
-{{- end }}
 {{- end }}
