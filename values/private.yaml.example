@@ -100,3 +100,10 @@ externalDns:
   txtOwnerId: "helm-charts"
   domainFilters: []
   cloudflareApiToken: ""
+# Alert delivery. Create a custom bot in a Lark group, paste its webhook URL
+# here, and add signSecret if the bot has signature verification turned on.
+alerting:
+  lark:
+    enabled: false
+    webhookUrl: ""
+    signSecret: ""

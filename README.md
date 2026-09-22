@@ -62,6 +62,7 @@ fluxGitops:
 | 中间件 | Redis | 缓存；开 JuiceFS 时必须开 | 关 |
 | 中间件 | NATS | 消息队列 | 关 |
 | 可观测 | kube-prometheus-stack | Prometheus、Grafana、Alertmanager | 开 |
+| 可观测 | 告警转发 | Alertmanager → 飞书机器人；填了 `alerting.lark.webhookUrl` 才渲染 | 随地址 |
 | 可观测 | VictoriaLogs | 日志存储 | 开 |
 | 可观测 | VictoriaLogs Collector | 采集节点上的容器日志 | 开 |
 | 可观测 | VictoriaMetrics | 指标备选，不要与 Prometheus 同时当主刮取 | 关 |
@@ -189,6 +190,57 @@ kubectl -n cilikube port-forward svc/cilikube-backend 8080:8080
 kubectl -n headlamp port-forward svc/headlamp 4466:80
 kubectl -n monitoring port-forward svc/kube-prometheus-stack-grafana 3000:80
 ```
+
+### 告警发到飞书
+
+`kube-prometheus-stack` 装完就有几十组告警规则在跑，但 chart 默认的 receivers 列表里**只有一个叫 `null` 的**——告警正常产生、正常路由，然后进黑洞。在群里建一个自定义机器人，把地址填进 `private.yaml`：
+
+```yaml
+alerting:
+  lark:
+    enabled: true
+    webhookUrl: "https://open.feishu.cn/open-apis/bot/v2/hook/..."
+    signSecret: ""          # 机器人开了签名校验才填
+```
+
+地址为空时**不会**给 Alertmanager 配这条路由，免得告警发给一个没人监听的地址。
+
+中间需要一个转换器，因为 **Alertmanager 不能给 webhook 套模板**：它发出去的 JSON 结构是固定的，而机器人只认自己那套 `{"msg_type": ...}`。`platform-config` 会渲染一个很小的转换服务——一段不依赖三方库的 Python 放在 ConfigMap 里，跑在官方 python 镜像上，不引第三方镜像。
+
+路由里 `Watchdog` 单独留给 `null`：它按设计永远在 firing，用来证明告警链路本身活着，不该推送。其余全部转发，`send_resolved` 打开，所以恢复时会收到一张绿色卡片。
+
+验证不需要等真实故障，往 Alertmanager 塞一条就行：
+
+```bash
+kubectl -n monitoring port-forward svc/kube-prometheus-stack-alertmanager 9093:9093
+curl -XPOST http://127.0.0.1:9093/api/v2/alerts -H 'Content-Type: application/json' -d '[{
+  "labels":{"alertname":"PipelineTest","severity":"warning"},
+  "annotations":{"summary":"告警链路联调"},
+  "startsAt":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}]'
+kubectl -n monitoring logs -l app=alert-lark --tail=5    # 转换器会打印机器人的原始响应
+```
+
+分组等待 30 秒，约 5 分钟后自动转 resolved 再来一张绿卡。
+
+### 让 Flux 知道该同步哪个仓库
+
+`flux2` 只装控制器，它并不知道要看哪个仓库——那层接线由 `flux-gitops` 声明，在 `private.yaml` 里配：
+
+```yaml
+fluxGitops:
+  enabled: true
+  sourceName: gitops
+  gitUrl: "http://gitlab.example.com/OWNER/gitops.git"
+  branch: main
+  deployToken: "<read_repository 的 token>"   # 公开仓留空则不建 Secret
+  kustomizations:
+    - name: demo
+      path: ./apps/demo
+```
+
+边界是这样划的：**helmfile 管平台组件，Flux 管业务应用**，而「Flux 该看哪个仓库」这一层属于 bootstrap，只能有一个地方说了算，这里交给 helmfile。所以业务应用不要写进本仓库的 helmfile，而是写进 Flux 看的那个 gitops 仓库；反过来，那个 gitops 仓库里也不要再放一份指向自己的 Kustomization，否则两边会抢同一个对象的归属。
+
+手工 `kubectl apply` 出这两个对象也能跑，但集群重建时这层接线不会跟着回来——控制器装回来了，却不知道去哪同步。
 
 Kind（无 L2 VIP：关闭 MetalLB 和 local-path，APISIX 使用 NodePort）：
 

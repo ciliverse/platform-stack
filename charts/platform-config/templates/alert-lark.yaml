@@ -1,0 +1,184 @@
+{{- if .Values.alerting.lark.enabled }}
+{{- if not .Values.alerting.lark.webhookUrl }}
+{{- fail "alerting.lark.enabled is on but alerting.lark.webhookUrl is empty; put the bot URL in values/private.yaml" }}
+{{- end }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.alerting.lark.name }}
+  namespace: {{ .Values.alerting.lark.namespace }}
+type: Opaque
+stringData:
+  webhook-url: {{ .Values.alerting.lark.webhookUrl | quote }}
+  sign-secret: {{ .Values.alerting.lark.signSecret | default "" | quote }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.alerting.lark.name }}
+  namespace: {{ .Values.alerting.lark.namespace }}
+data:
+  adapter.py: |
+    # Alertmanager posts its own fixed JSON; a Lark bot wants {"msg_type": ...}.
+    # Nothing here needs a dependency, so it runs on a stock python image.
+    import base64
+    import hashlib
+    import hmac
+    import json
+    import os
+    import time
+    import urllib.request
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    WEBHOOK = os.environ["LARK_WEBHOOK_URL"]
+    SECRET = os.environ.get("LARK_SIGN_SECRET", "")
+    COLOR = {"firing": "red", "resolved": "green"}
+    MAX_ALERTS = 10
+
+    def sign(ts):
+        key = "{}\n{}".format(ts, SECRET).encode()
+        return base64.b64encode(hmac.new(key, b"", hashlib.sha256).digest()).decode()
+
+    def describe(alert):
+        labels = alert.get("labels", {})
+        ann = alert.get("annotations", {})
+        lines = ["**{}**".format(ann.get("summary") or labels.get("alertname", "?"))]
+        where = " / ".join(
+            v for v in (labels.get("namespace"), labels.get("pod") or labels.get("instance")) if v
+        )
+        if where:
+            lines.append("位置：{}".format(where))
+        if ann.get("description"):
+            lines.append(ann["description"][:300])
+        lines.append(
+            "级别：{}　开始：{}".format(labels.get("severity", "-"), alert.get("startsAt", "")[:19])
+        )
+        return lines
+
+    def card(payload):
+        status = payload.get("status", "firing")
+        alerts = payload.get("alerts", [])
+        name = payload.get("commonLabels", {}).get("alertname", "alert")
+        lines = []
+        for alert in alerts[:MAX_ALERTS]:
+            lines.extend(describe(alert))
+            lines.append("---")
+        if len(alerts) > MAX_ALERTS:
+            lines.append("另有 {} 条未列出".format(len(alerts) - MAX_ALERTS))
+        body = {
+            "msg_type": "interactive",
+            "card": {
+                "config": {"wide_screen_mode": True},
+                "header": {
+                    "title": {
+                        "tag": "plain_text",
+                        "content": "[{}] {} x{}".format(status.upper(), name, len(alerts)),
+                    },
+                    "template": COLOR.get(status, "grey"),
+                },
+                "elements": [
+                    {"tag": "div", "text": {"tag": "lark_md", "content": "\n".join(lines) or "(empty)"}}
+                ],
+            },
+        }
+        if SECRET:
+            ts = str(int(time.time()))
+            body["timestamp"] = ts
+            body["sign"] = sign(ts)
+        return body
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"ok")
+
+        def do_POST(self):
+            size = int(self.headers.get("Content-Length", 0))
+            try:
+                payload = json.loads(self.rfile.read(size) or b"{}")
+                request = urllib.request.Request(
+                    WEBHOOK,
+                    data=json.dumps(card(payload)).encode(),
+                    headers={"Content-Type": "application/json"},
+                )
+                with urllib.request.urlopen(request, timeout=10) as response:
+                    answer = response.read().decode()
+                # Lark answers 200 with a non-zero code when it rejects the card.
+                print("lark response: {}".format(answer), flush=True)
+                status = 200 if '"code":0' in answer.replace(" ", "") else 500
+            except Exception as err:
+                print("error: {}".format(err), flush=True)
+                status = 500
+            self.send_response(status)
+            self.end_headers()
+
+        def log_message(self, *args):
+            pass
+
+    HTTPServer(("", 8080), Handler).serve_forever()
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.alerting.lark.name }}
+  namespace: {{ .Values.alerting.lark.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.alerting.lark.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.alerting.lark.name }}
+      annotations:
+        checksum/adapter: {{ .Files.Get "templates/alert-lark.yaml" | sha256sum }}
+    spec:
+      containers:
+        - name: adapter
+          image: {{ .Values.alerting.lark.image }}
+          command: ["python", "-u", "/app/adapter.py"]
+          env:
+            - name: LARK_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.alerting.lark.name }}
+                  key: webhook-url
+            - name: LARK_SIGN_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.alerting.lark.name }}
+                  key: sign-secret
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+          volumeMounts:
+            - name: adapter
+              mountPath: /app
+      volumes:
+        - name: adapter
+          configMap:
+            name: {{ .Values.alerting.lark.name }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.alerting.lark.name }}
+  namespace: {{ .Values.alerting.lark.namespace }}
+spec:
+  selector:
+    app: {{ .Values.alerting.lark.name }}
+  ports:
+    - port: 8080
+      targetPort: 8080
+{{- end }}

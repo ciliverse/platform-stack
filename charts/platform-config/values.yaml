@@ -59,3 +59,16 @@ exampleIngress:
     serviceName: kube-prometheus-stack-grafana
     servicePort: 80
     tlsSecretName: grafana-tls
+
+# Turns Alertmanager webhooks into Lark bot cards. Alertmanager cannot template
+# its webhook body, and a Lark bot only accepts its own message shape, so the
+# two need something in between.
+alerting:
+  lark:
+    enabled: false
+    name: alert-lark
+    namespace: monitoring
+    # Bot URL, and the signing secret if the bot has 签名校验 turned on.
+    webhookUrl: ""
+    signSecret: ""
+    image: docker.m.daocloud.io/library/python:3.12-alpine

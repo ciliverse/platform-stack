@@ -148,6 +148,11 @@ Which issuer the Ingresses ask for. ACME when it can actually validate, the
 cluster's own root when the hosts only resolve on the LAN, otherwise the
 per-certificate selfSigned issuer that is always there.
 */}}
+{{/*
+Alertmanager only gets a route to Lark when the adapter is actually rendered;
+otherwise its alerts would go to a receiver that nothing is listening on.
+*/}}
+{{- $larkAlerts := and (dig "alerting" "lark" "enabled" false .Values) (ne (dig "alerting" "lark" "webhookUrl" "" .Values) "") }}
 {{- $clusterIssuer := "selfsigned" }}
 {{- if .Values.letsencrypt.enabled | default false }}
 {{- $clusterIssuer = "letsencrypt-prod" }}
@@ -230,6 +235,30 @@ releases:
     createNamespace: true
     values:
       - values/apps/kube-prometheus-stack.yaml
+      {{- if $larkAlerts }}
+      # The chart default routes everything to a receiver named 'null', so
+      # alerts fire into nothing until a real one is named here.
+      - alertmanager:
+          config:
+            route:
+              group_by: ["alertname", "namespace"]
+              group_wait: 30s
+              group_interval: 5m
+              repeat_interval: 4h
+              receiver: lark
+              routes:
+                # Watchdog fires forever by design; it proves the pipeline
+                # works and is not something to notify on.
+                - receiver: "null"
+                  matchers:
+                    - alertname = "Watchdog"
+            receivers:
+              - name: "null"
+              - name: lark
+                webhook_configs:
+                  - url: http://alert-lark.{{ .Values.apps.kubePrometheusStack.namespace }}.svc:8080/
+                    send_resolved: true
+      {{- end }}
       {{- if eq .Environment.Name "kind" }}
       - values/kind/kube-prometheus-stack.yaml
       {{- if .Values.kindMirror }}
@@ -444,6 +473,12 @@ releases:
           ingressClass: {{ $ingressClass | quote }}
         localCa:
           enabled: {{ dig "localCa" "enabled" false .Values }}
+        alerting:
+          lark:
+            enabled: {{ $larkAlerts }}
+            namespace: {{ .Values.apps.kubePrometheusStack.namespace }}
+            webhookUrl: {{ dig "alerting" "lark" "webhookUrl" "" .Values | quote }}
+            signSecret: {{ dig "alerting" "lark" "signSecret" "" .Values | quote }}
         exampleIngress:
           enabled: {{ .Values.exampleIngress.enabled | default false }}
           clusterIssuer: {{ $clusterIssuer | quote }}
