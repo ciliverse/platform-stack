@@ -37,10 +37,15 @@ apps:
     version: "9.4.17"
     namespace: argocd
   # Upstream calls the community Helm chart a dev install and maintains it on a
-  # best-effort basis. It is here because it fits the rest of this file, not
-  # because it is the recommended way in; see the Flux section of the README.
+  # best-effort basis, so the default way in is `flux bootstrap` instead and
+  # this stays off. See the Flux section of the README.
+  #
+  # Turning it back on where Flux is already bootstrapped installs a second copy
+  # of the same controllers; turning it off where it is already installed makes
+  # the next apply uninstall it, which takes the CRDs and every object of those
+  # kinds with it.
   flux2:
-    enabled: true
+    enabled: false
     version: "2.18.4"
     namespace: flux-system
   # The officially sanctioned alternative: the operator owns the controllers and

@@ -47,7 +47,7 @@ fluxGitops:
 | 镜像仓库 | GitLab Registry | 随 GitLab，CI 推镜像 | 随 GitLab |
 | 镜像仓库 | Harbor | 独立仓库；与 GitLab Registry 二选一 | 关 |
 | CD | Argo CD | 把应用同步到集群 | 开 |
-| CD | Flux（community chart） | 同上；不要与 Argo CD 同时当主控 | 开 |
+| CD | Flux（community chart） | 默认走 `flux bootstrap`，不从这里装 | 关 |
 | CD | Flux Operator | 官方 bootstrap 方式之一，与上一行互斥 | 关 |
 | 流量入口 | MetalLB | 裸金属 L2 VIP，给网关 LoadBalancer | 开 |
 | 流量入口 | cert-manager | 发证书；ClusterIssuer `selfsigned`，可选 `local-ca`、`letsencrypt-prod` | 开 |
@@ -233,9 +233,19 @@ Flux 要装的是两样东西：**控制器**，和**「该同步哪个仓库的
 
 | 开关 | 装什么 | 指针在哪 | 说明 |
 | --- | --- | --- | --- |
+| （都不开）| `flux bootstrap` 自己装 | Git 仓库里，Flux 自管 | 官方首推，**本仓库的默认** |
 | `apps.flux2` | community chart 装 6 个控制器 | 需配合 `fluxGitops` | 开箱最省事，但上游把它算作 dev install |
 | `apps.fluxOperator` | operator 本身 | `FluxInstance` 对象 | 官方 bootstrap 方式之一；本仓库**不渲染** `FluxInstance` |
-| （不用开关） | `flux bootstrap` 自己装 | Git 仓库里，Flux 自管 | 官方首推；此时两个开关都要关 |
+
+两个开关默认都关，因为默认路线是 bootstrap。bootstrap 命令长这样：
+
+```bash
+flux bootstrap git \
+  --url=<gitops 仓库> --branch=main --path=clusters/<name> \
+  --namespace=flux-system --version=v<版本> --token-auth --username=<user>
+```
+
+明文 HTTP 的仓库还要加 `--allow-insecure-http=true`，否则 CLI 直接拒绝。密码走 `GIT_PASSWORD` 环境变量，不要写进命令行。
 
 `apps.flux2` 和 `apps.fluxOperator` 同时打开会直接 fail：两者往同一个命名空间装同一批控制器。
 
@@ -257,15 +267,39 @@ fluxGitops:
 
 不管走哪条，边界都是同一条：**helmfile 管平台组件，Flux 管业务应用**。业务应用不要写进本仓库的 helmfile，而要写进 Flux 看的那个仓库；反过来那个仓库里也不要再放一份指向自己的 Kustomization。手工 `kubectl apply` 出 GitRepository 和 Kustomization 当然也能跑，但集群重建时这层接线不会跟着回来——控制器装回来了，却不知道去哪同步。
 
-#### 从 flux2 换到 bootstrap 或 operator
+#### 从 flux2 换到 bootstrap
 
-**先把 GitRepository / Kustomization 备份出来再动。**`helm uninstall flux2` 会带走 chart 装的那批 CRD，而删 CRD 等于删掉集群里所有该类型的对象——正在同步的 GitRepository、Kustomization、HelmRelease 全部消失，连带它们 `prune` 过的工作负载。
+**就地接管，不要先卸载。**`flux bootstrap` 带 `--force` 可以直接盖在一套已经装好的控制器上——它做的是升级与补齐自管清单，不是重装。
+
+反过来，**先 `helm uninstall flux2` 再 bootstrap 是会出事的**：卸载会带走 chart 装的那批 CRD，而删 CRD 等于删掉集群里所有该类型的对象——正在同步的 GitRepository、Kustomization、HelmRelease 全部消失，连带它们 `prune` 过的工作负载。顺序反了，代价是一次全量重建。
 
 ```bash
-kubectl get gitrepository,kustomization,helmrelease -A -o yaml > flux-objects.yaml
+flux bootstrap git \
+  --url=<gitops 仓库> --branch=main --path=clusters/<name> \
+  --version=v<与集群当前一致> --force
 ```
 
-Flux Operator 支持接管已有安装，上游写了迁移指南；`flux bootstrap` 在控制器已存在时会做升级而不是重装。无论哪种，先备份再动手。
+`--version` 写成集群里正在跑的那个版本，接管这一步就不含版本变更，出问题时只有一个变量。升级留到接管完成之后，改 git 即可。
+
+接管之后 Helm 那边还留着一条 release 记录，它迟早要被处理——`apps.flux2` 一旦关掉，`helmfile apply` 就会去执行上面那条 `helm uninstall`。
+
+**给活对象打 `helm.sh/resource-policy: keep` 是没用的。**Helm 判断保留与否，读的是它自己存的那份 release manifest，不是集群里对象当前的注解。在外面补注解，Helm 根本看不见，照删不误——37 个对象连 14 个 CRD 一起没了。
+
+真正管用的是下面两条之一：
+
+- **把 `flux2` 这一条从 `helmfile.yaml.gotmpl` 里删掉**，而不是设 `installed: false`。清单不认识它，就永远不会去卸载它。
+- **接受它被删，然后重跑一次 bootstrap 恢复。**这条之所以可行，是因为 bootstrap 已经把全部组件清单提交进了 git；但有一个前提必须先做好——
+
+删 CRD 会触发 CR 上的 `finalizers.fluxcd.io`，而 Kustomization 的 finalizer 会执行 `prune`，**把它同步过的业务资源一并删掉**。所以卸载后要赶在控制器重新起来之前摘掉 finalizer：
+
+```bash
+kubectl patch kustomization <name> -n flux-system --type=merge -p '{"metadata":{"finalizers":null}}'
+kubectl patch gitrepository <name> -n flux-system --type=merge -p '{"metadata":{"finalizers":null}}'
+```
+
+摘掉之后 CRD 删除会立刻完成且不做 prune，再跑一遍同样的 `flux bootstrap` 就能把 CRD、控制器、同步配置全部装回来。
+
+Flux Operator 也支持接管已有安装，上游写了迁移指南，思路相同。
 
 Kind（无 L2 VIP：关闭 MetalLB 和 local-path，APISIX 使用 NodePort）：
 
