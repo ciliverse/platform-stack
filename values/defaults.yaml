@@ -36,9 +36,19 @@ apps:
     enabled: true
     version: "9.4.17"
     namespace: argocd
+  # Upstream calls the community Helm chart a dev install and maintains it on a
+  # best-effort basis. It is here because it fits the rest of this file, not
+  # because it is the recommended way in; see the Flux section of the README.
   flux2:
     enabled: true
     version: "2.18.4"
+    namespace: flux-system
+  # The officially sanctioned alternative: the operator owns the controllers and
+  # a FluxInstance object describes them. Off by default, and mutually exclusive
+  # with flux2 — both install the same controllers into the same namespace.
+  fluxOperator:
+    enabled: false
+    version: "0.60.0"
     namespace: flux-system
   harbor:
     enabled: false

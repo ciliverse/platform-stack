@@ -7,3 +7,10 @@ controller:
     # registry being reachable. The tag is pinned, so the cached image is the
     # same image.
     pullPolicy: IfNotPresent
+  # The init container downloads the plugin set on every start, so a cluster
+  # that boots before its egress does leaves Jenkins in CrashLoopBackOff. Once
+  # JENKINS_HOME has the plugins, skip that step entirely.
+  #
+  # The trade-off: changes to installPlugins no longer take effect on their
+  # own. Delete $JENKINS_HOME/initialization-completed to let init run again.
+  initializeOnce: true

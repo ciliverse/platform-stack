@@ -1,0 +1,6 @@
+# Differences from upstream defaults only. Default: disabled.
+#
+# The operator only installs itself. What it then runs is described by a
+# FluxInstance object, which this repository does not render: on this cluster
+# the controllers and their sync are meant to come from `flux bootstrap`, and
+# two things declaring the same controllers would fight over them.

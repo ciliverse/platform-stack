@@ -47,7 +47,8 @@ fluxGitops:
 | 镜像仓库 | GitLab Registry | 随 GitLab，CI 推镜像 | 随 GitLab |
 | 镜像仓库 | Harbor | 独立仓库；与 GitLab Registry 二选一 | 关 |
 | CD | Argo CD | 把应用同步到集群 | 开 |
-| CD | Flux | 同上；不要与 Argo CD 同时当主控 | 开 |
+| CD | Flux（community chart） | 同上；不要与 Argo CD 同时当主控 | 开 |
+| CD | Flux Operator | 官方 bootstrap 方式之一，与上一行互斥 | 关 |
 | 流量入口 | MetalLB | 裸金属 L2 VIP，给网关 LoadBalancer | 开 |
 | 流量入口 | cert-manager | 发证书；ClusterIssuer `selfsigned`，可选 `local-ca`、`letsencrypt-prod` | 开 |
 | 流量入口 | APISIX | HTTP/HTTPS 网关与 Ingress Controller | 开 |
@@ -182,6 +183,8 @@ Argo CD 和 Jenkins 的入口同样由 `private.yaml` 的 `hosts.argocd` / `host
 - Argo CD 开了 `configs.params.server.insecure`。网关终结 TLS 后转发的是明文 HTTP，不关这个开关，`argocd-server` 会把它重定向回 HTTPS，浏览器一直转圈。
 - Jenkins 的 `controller.jenkinsUrl` 指向对外域名，否则它生成的绝对链接会用集群内的 Service 名。chart 默认不渲染 Ingress 的 `path`，这里显式写了 `/` 与 `Prefix`。
 
+Jenkins 还开了 `controller.initializeOnce`。它的 init 容器每次启动都去下载整份插件清单，集群启动早于出网链路时下载失败，init 退出——而插件目录是 emptyDir，重试时上一轮的文件还在，`cp -i` 于是逐个问"要覆盖吗"，从此卡死在那里。打开这个开关后，JENKINS_HOME 里有 `initialization-completed` 就整段跳过。代价是改 `installPlugins` 不再自动生效，需要删掉那个标记文件让 init 重跑一次。
+
 没有域名时可以 port-forward：
 
 ```bash
@@ -222,9 +225,21 @@ kubectl -n monitoring logs -l app=alert-lark --tail=5    # 转换器会打印机
 
 分组等待 30 秒，约 5 分钟后自动转 resolved 再来一张绿卡。
 
-### 让 Flux 知道该同步哪个仓库
+### Flux 怎么装
 
-`flux2` 只装控制器，它并不知道要看哪个仓库——那层接线由 `flux-gitops` 声明，在 `private.yaml` 里配：
+Flux 要装的是两样东西：**控制器**，和**「该同步哪个仓库的哪个目录」这个指针**。控制器装好而没有指针，它就坐在那儿什么也不干。本仓库提供三种装法，因为上游推荐的那种和「helmfile 管一切平台组件」这个模型是有张力的。
+
+上游的原话是 *“The recommended way of installing Flux on Kubernetes clusters is by using the bootstrap procedure.”* 官方认可的 bootstrap 有三种实现：`flux bootstrap` CLI、Terraform provider、Flux Operator。而 `fluxcd-community/flux2` 这个 Helm chart 被归在 **Dev install（for testing purposes）**下面，并注明由社区 best effort 维护、不保证发版节奏。
+
+| 开关 | 装什么 | 指针在哪 | 说明 |
+| --- | --- | --- | --- |
+| `apps.flux2` | community chart 装 6 个控制器 | 需配合 `fluxGitops` | 开箱最省事，但上游把它算作 dev install |
+| `apps.fluxOperator` | operator 本身 | `FluxInstance` 对象 | 官方 bootstrap 方式之一；本仓库**不渲染** `FluxInstance` |
+| （不用开关） | `flux bootstrap` 自己装 | Git 仓库里，Flux 自管 | 官方首推；此时两个开关都要关 |
+
+`apps.flux2` 和 `apps.fluxOperator` 同时打开会直接 fail：两者往同一个命名空间装同一批控制器。
+
+走 `flux2` 时，指针由 `flux-gitops` 声明，在 `private.yaml` 里配：
 
 ```yaml
 fluxGitops:
@@ -238,9 +253,19 @@ fluxGitops:
       path: ./apps/demo
 ```
 
-边界是这样划的：**helmfile 管平台组件，Flux 管业务应用**，而「Flux 该看哪个仓库」这一层属于 bootstrap，只能有一个地方说了算，这里交给 helmfile。所以业务应用不要写进本仓库的 helmfile，而是写进 Flux 看的那个 gitops 仓库；反过来，那个 gitops 仓库里也不要再放一份指向自己的 Kustomization，否则两边会抢同一个对象的归属。
+走 operator 或 bootstrap 时**不要**开 `fluxGitops`：指针改由 `FluxInstance` 或 bootstrap 提交的清单描述，两边都声明会抢同一个对象。
 
-手工 `kubectl apply` 出这两个对象也能跑，但集群重建时这层接线不会跟着回来——控制器装回来了，却不知道去哪同步。
+不管走哪条，边界都是同一条：**helmfile 管平台组件，Flux 管业务应用**。业务应用不要写进本仓库的 helmfile，而要写进 Flux 看的那个仓库；反过来那个仓库里也不要再放一份指向自己的 Kustomization。手工 `kubectl apply` 出 GitRepository 和 Kustomization 当然也能跑，但集群重建时这层接线不会跟着回来——控制器装回来了，却不知道去哪同步。
+
+#### 从 flux2 换到 bootstrap 或 operator
+
+**先把 GitRepository / Kustomization 备份出来再动。**`helm uninstall flux2` 会带走 chart 装的那批 CRD，而删 CRD 等于删掉集群里所有该类型的对象——正在同步的 GitRepository、Kustomization、HelmRelease 全部消失，连带它们 `prune` 过的工作负载。
+
+```bash
+kubectl get gitrepository,kustomization,helmrelease -A -o yaml > flux-objects.yaml
+```
+
+Flux Operator 支持接管已有安装，上游写了迁移指南；`flux bootstrap` 在控制器已存在时会做升级而不是重装。无论哪种，先备份再动手。
 
 Kind（无 L2 VIP：关闭 MetalLB 和 local-path，APISIX 使用 NodePort）：
 

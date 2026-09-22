@@ -595,6 +595,19 @@ releases:
     values:
       - values/apps/flux2.yaml
 
+{{- if and .Values.apps.flux2.enabled (dig "apps" "fluxOperator" "enabled" false .Values) }}
+{{- fail "apps.flux2 and apps.fluxOperator both install the Flux controllers; enable one" }}
+{{- end }}
+
+  - name: flux-operator
+    namespace: {{ dig "apps" "fluxOperator" "namespace" "flux-system" .Values }}
+    chart: oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator
+    version: {{ dig "apps" "fluxOperator" "version" "" .Values | quote }}
+    installed: {{ dig "apps" "fluxOperator" "enabled" false .Values }}
+    createNamespace: true
+    values:
+      - values/apps/flux-operator.yaml
+
   - name: flux-gitops
     namespace: {{ .Values.apps.flux2.namespace }}
     chart: ./charts/flux-gitops
