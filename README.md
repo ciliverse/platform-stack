@@ -178,6 +178,13 @@ kubectl -n apisix get svc apisix-gateway
 
 把 CiliKube / Grafana 挂到网关：`exampleIngress.enabled: true`，并在 `private.yaml` 写入 `hosts.cilikube` / `hosts.grafana`。
 
+Grafana、Prometheus、Alertmanager 的入口由 `hosts.grafana` / `hosts.prometheus` / `hosts.alertmanager` 决定，写法和下面两个一致。有两处 chart 自己做得不对，helmfile 里补掉了：
+
+- **Grafana 的密码默认每次 apply 都会变**。`adminPassword` 为空时 chart 用随机串渲染，于是每升级一次登录就失效。填 `secrets.grafanaAdminPassword` 固定下来；想知道现在在用哪个，`kubectl -n <ns> get secret kube-prometheus-stack-grafana -o jsonpath='{.data.admin-password}' | base64 -d`。
+- **`externalUrl` 会被推导成 `http://`**，哪怕网关只提供 https。这个地址会出现在告警通知的链接里，所以 helmfile 按 `https://<host>` 显式写入。
+
+还有一条不是 chart 的问题：**Prometheus 和 Alertmanager 自身没有任何认证**。给它们配上域名，等于把全部指标对能访问到这个地址的人开放，Alertmanager 的界面还能静默告警。只在可信网络里这么做，或者自己在网关上加一层。
+
 Argo CD 和 Jenkins 的入口同样由 `private.yaml` 的 `hosts.argocd` / `hosts.jenkins` 决定：**填了就渲染 Ingress，留空就只有 ClusterIP**，需要时 port-forward。证书注解自动取当前可用的 issuer（`letsencrypt.enabled` → `letsencrypt-prod`，否则 `localCa.enabled` → `local-ca`，再否则 `selfsigned`）。这两个 chart 各有一处必须配合网关：
 
 - Argo CD 开了 `configs.params.server.insecure`。网关终结 TLS 后转发的是明文 HTTP，不关这个开关，`argocd-server` 会把它重定向回 HTTPS，浏览器一直转圈。
@@ -191,7 +198,6 @@ Jenkins 还开了 `controller.initializeOnce`。它的 init 容器每次启动�
 kubectl -n cilikube port-forward svc/cilikube-frontend 8088:80
 kubectl -n cilikube port-forward svc/cilikube-backend 8080:8080
 kubectl -n headlamp port-forward svc/headlamp 4466:80
-kubectl -n monitoring port-forward svc/kube-prometheus-stack-grafana 3000:80
 ```
 
 ### 告警发到飞书
