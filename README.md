@@ -342,6 +342,16 @@ apps:
 
 kube-prometheus-stack 跨大版本升级时，**Helm 不会更新 CRD**，新 operator 会拿旧 schema 去 reconcile。chart 自带的 `crds.upgradeJob` 用 pre-upgrade hook 补这一刀，本仓已经打开（还带 `forceConflicts`，因为集群里的 CRD 归最早创建它的 field manager 所有）。
 
+Argo CD 从 9.x 升到 10.x 会**在自己的命名空间里生成一套 NetworkPolicy**（每个组件一条）。装了 CNI 策略引擎的集群要留意：`argocd-server` 那条放行全部入站，网关照常能进；但如果你另外还有拒绝式的命名空间策略，先看一眼两边叠加的结果。
+
+OpenTelemetry Collector 在 chart 0.171 把导出器名从 `otlp` 改成了 `otlp_grpc`。老名字暂时还会被 chart 重写，但兼容层会去掉，所以 `values/apps/opentelemetry-collector.yaml` 里已经写成新名字。
+
+升级中途失败时还有一个坑：**Helm 已经把新版本记成一次修订**，哪怕状态是 `failed`。这时 `helmfile apply` 拿它当基线去比，会得出「没有差异」而跳过，看起来像没执行。用 `helmfile sync` 跳过比对直接升，镜像拉取慢就把超时放大：
+
+```bash
+helmfile -l name=argocd sync --args "--timeout 20m"
+```
+
 ## 命名约定
 
 发布名就是应用名，命名空间同名，一个应用一个命名空间。两处例外都有原因：`metrics-server` 属于集群插件，跟上游一样放 `kube-system`；`jenkins` 在 `cicd`，因为 JENKINS_HOME 是 PVC，换命名空间等于迁数据。

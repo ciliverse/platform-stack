@@ -6,8 +6,9 @@
 # node, so a workload does not depend on the agent of its own node.
 mode: deployment
 image:
-  # Nodes here cannot reach Docker Hub directly; use the DaoCloud mirror.
-  repository: docker.m.daocloud.io/otel/opentelemetry-collector-k8s
+  # Upstream publishes here; the Docker Hub copy is a leftover from when this
+  # cluster had no egress, and its mirror stopped answering for newer tags.
+  repository: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s
 command:
   name: otelcol-k8s
 
@@ -23,7 +24,9 @@ presets:
 # chart defaults.
 config:
   exporters:
-    otlp/tempo:
+    # Chart 0.171 renamed `otlp` to `otlp_grpc`. The chart still rewrites the
+    # old name, but that compatibility shim is going away.
+    otlp_grpc/tempo:
       endpoint: tempo.monitoring.svc:4317
       tls:
         insecure: true
@@ -31,5 +34,5 @@ config:
     pipelines:
       traces:
         exporters:
-          - otlp/tempo
+          - otlp_grpc/tempo
           - debug

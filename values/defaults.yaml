@@ -29,12 +29,12 @@ apps:
     namespace: gitlab
   jenkins:
     enabled: true
-    version: "5.9.9"
+    version: "5.9.63"
     # JENKINS_HOME is a PVC; moving namespaces means migrating the volume.
     namespace: cicd
   argoCd:
     enabled: true
-    version: "9.4.17"
+    version: "10.9.2"
     namespace: argocd
   # Upstream calls the community Helm chart a dev install and maintains it on a
   # best-effort basis, so the default way in is `flux bootstrap` instead and
@@ -113,13 +113,13 @@ apps:
     namespace: headlamp
   kubePrometheusStack:
     enabled: true
-    version: "86.1.1"
+    version: "91.4.1"
     namespace: monitoring
   # Traces live next to kube-prometheus-stack in `monitoring`: the collector
   # exports to Tempo by Service DNS, and Grafana links metrics to traces.
   opentelemetryCollector:
     enabled: true
-    version: "0.147.1"
+    version: "0.173.1"
     namespace: monitoring
   tempo:
     enabled: true
