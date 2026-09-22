@@ -11,6 +11,9 @@
 # the chart's placeholder values at startup, so helmfile fails until these are
 # real. Both are rejected while they still start with REPLACE_ME.
 secrets:
+  # Leave empty and the chart invents a new Grafana password on every render,
+  # so each apply rotates the admin login.
+  grafanaAdminPassword: ""
   jwtSecret: "REPLACE_ME_GENERATE_WITH_openssl_rand"
   encryptionKey: "REPLACE_ME_32_CHARS_openssl_hex16"
 
@@ -47,15 +50,16 @@ fluxGitops:
   #   namespace: demo        # where the Kustomization object lives; default flux-system
   #   createNamespace: true
 
+# Set a host to render an Ingress for that release; empty means no Ingress and
+# you reach it with port-forward.
 hosts:
   cilikube: ""
-  grafana: ""
-  # Set these to render an Ingress for the release; empty means no Ingress.
   argocd: ""
   jenkins: ""
   grafana: ""
-  # These two ship no authentication. Setting a host exposes every metric to
-  # anyone who can reach it, and the Alertmanager UI can silence alerts.
+  # These two ship no authentication of their own. Setting a host exposes every
+  # metric to anyone who can reach it, and the Alertmanager UI can silence
+  # alerts. Put something in front of them or leave them empty.
   prometheus: ""
   alertmanager: ""
 

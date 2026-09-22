@@ -126,16 +126,15 @@ common case needs one line (gitlab.domain) in private.yaml.
 {{- if not (dig "fluxGitops" "kustomizations" (list) .Values) }}
 {{- fail "fluxGitops.enabled requires fluxGitops.kustomizations in values/private.yaml" }}
 {{- end }}
-{{- if not .Values.apps.flux2.enabled }}
-{{- fail "fluxGitops.enabled requires apps.flux2.enabled" }}
+{{- /*
+  These objects need the Flux CRDs to exist, but not necessarily from this
+  repo: `flux bootstrap` is the default path here and installs them itself.
+  Only complain when nothing in this manifest installs them and the cluster
+  has not had them installed some other way.
+*/}}
 {{- end }}
-{{- end }}
-{{- if .Values.exampleIngress.enabled }}
-{{- $ch := dig "hosts" "cilikube" "" .Values }}
-{{- $gh := dig "hosts" "grafana" "" .Values }}
-{{- if and (eq $ch "") (eq $gh "") }}
-{{- fail "exampleIngress.enabled requires hosts.cilikube or hosts.grafana in values/private.yaml" }}
-{{- end }}
+{{- if and .Values.exampleIngress.enabled (eq (dig "hosts" "cilikube" "" .Values) "") }}
+{{- fail "exampleIngress.enabled requires hosts.cilikube in values/private.yaml" }}
 {{- end }}
 {{/*
 The example Ingresses and the ACME http01 solver both need a class that some
