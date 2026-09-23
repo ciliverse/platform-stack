@@ -83,6 +83,8 @@ harbor:
 gitlabRunner:
   gitlabUrl: ""
   runnerToken: ""
+  # Comma-separated tags. Leave empty only when the runner should accept untagged jobs.
+  tags: ""
   # Only when the GitLab host has no DNS record the cluster can resolve.
   # Both the runner pod and the job pods get these entries.
   hostAliases: []

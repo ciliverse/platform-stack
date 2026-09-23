@@ -114,7 +114,7 @@ CI 把镜像推到 **GitLab Registry** 或 **Harbor**，不要两个都当主仓
 
 GitLab 自带的 cert-manager 与 issuer 在 `values/apps/gitlab.yaml` 里关掉了：本仓单独装 cert-manager，ClusterIssuer 由 `charts/platform-config` 提供，两边都开会变成两个证书来源。
 
-GitLab CI 要在集群里跑 job，还要单独开 `gitlabRunner`（只开 GitLab 不会装 Runner）。在 `private.yaml` 填 `gitlabUrl`（带 `https://`）和 `runnerToken`。token 从 GitLab 里已注册的 runner 拿，不是旧的 registration token。GitLab 的主机名在集群里解析不了时，在 `private.yaml` 写 `gitlabRunner.hostAliases`（`ip` + `hostnames` 的列表）。CoreDNS 不读节点 `/etc/hosts`，而顶层 `hostAliases` 只作用在 Runner 自己的 Pod，**job Pod 是另一批 Pod，要在 `runners.config` 里重复一遍 `[[runners.kubernetes.host_aliases]]`**，否则 DinD 解析不了那个主机名——helmfile 会按这份列表把两处一起渲染出来。DinD 还必须在同一段里写 `privileged = true`（chart 0.89 不再认 `runners.privileged`，见 `values/apps/gitlab-runner.yaml`）。
+GitLab CI 要在集群里跑 job，还要单独开 `gitlabRunner`（只开 GitLab 不会装 Runner）。在 `private.yaml` 填 `gitlabUrl`（带 `https://`）、`runnerToken` 和 `tags`。token 从 GitLab 里已注册的 runner 拿，不是旧的 registration token。`tags` 不填时 chart 会把 `RUNNER_TAG_LIST` 渲成空字符串，下一次 apply 会清掉 Runner 上已有的标签，按标签挑 Runner 的 job 就再也排不上。GitLab 的主机名在集群里解析不了时，在 `private.yaml` 写 `gitlabRunner.hostAliases`（`ip` + `hostnames` 的列表）。CoreDNS 不读节点 `/etc/hosts`，而顶层 `hostAliases` 只作用在 Runner 自己的 Pod，**job Pod 是另一批 Pod，要在 `runners.config` 里重复一遍 `[[runners.kubernetes.host_aliases]]`**，否则 DinD 解析不了那个主机名——helmfile 会按这份列表把两处一起渲染出来。DinD 还必须在同一段里写 `privileged = true`（chart 0.89 不再认 `runners.privileged`，见 `values/apps/gitlab-runner.yaml`）。
 
 ExternalDNS 默认关。打开后按 Ingress / Service 写 DNS；同时开了 Gateway API 或 Envoy Gateway 时会多 watch `HTTPRoute`。策略是 `upsert-only`（不删你在 DNS 控制台手工建的记录）。必须在 `private.yaml` 写 `provider`（不要用 chart 默认的 `aws`）；Cloudflare 还要 `cloudflareApiToken`。
 
@@ -141,7 +141,7 @@ CiliKube 公开 index 上的 chart 版本是 **1.0.0**，镜像 tag 在 `values/
   - 若开启 Redis / JuiceFS：`redis.password`（建议 hex）
   - 若开启 RustFS / MinIO：access/secret，不要用上游默认口令
   - 若开启 Harbor：`harbor.adminPassword`，不要用 `Harbor12345`
-  - 若开启 GitLab Runner：`gitlabRunner.gitlabUrl`（带协议）和 `gitlabRunner.runnerToken`（GitLab 里已注册 runner 的 token，不是旧 registration token）
+  - 若开启 GitLab Runner：`gitlabRunner.gitlabUrl`（带协议）、`gitlabRunner.runnerToken`（已注册 runner 的 token，不是旧 registration token）和 `gitlabRunner.tags`（逗号分隔；留空会在下次 apply 清掉 Runner 上已有的标签）
   - 若开启 ExternalDNS：`externalDns.provider`（例如 `cloudflare`）；Cloudflare 还要填 `cloudflareApiToken`，可选 `domainFilters` / `txtOwnerId`
 
 面向空集群。目标集群里已有同名 Helm release 时，不要用默认开关直接 apply（会升级或冲突）；把某项改为 `enabled: false` 再 apply 会卸载已有 release。

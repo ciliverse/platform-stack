@@ -741,6 +741,10 @@ releases:
       - values/apps/gitlab-runner.yaml
       - gitlabUrl: {{ dig "gitlabRunner" "gitlabUrl" "" .Values | quote }}
         runnerToken: {{ dig "gitlabRunner" "runnerToken" "" .Values | quote }}
+        runners:
+          # Comma-separated. Empty string is what the chart defaults to, and an
+          # apply then wipes whatever tag the live runner was registered with.
+          tags: {{ dig "gitlabRunner" "tags" "" .Values | quote }}
       {{- with dig "gitlabRunner" "hostAliases" list .Values }}
       # CoreDNS does not read node /etc/hosts. The top-level list reaches the
       # runner pod; job pods are separate and need the same entries repeated

@@ -1,5 +1,5 @@
 # Runs GitLab CI jobs in-cluster. Default: disabled.
-# gitlabUrl, runnerToken and hostAliases come from values/private.yaml via helmfile.
+# gitlabUrl, runnerToken, tags and hostAliases come from values/private.yaml via helmfile.
 # Chart 0.89 ignores runners.privileged; DinD needs privileged in runners.config.
 rbac:
   create: true
